@@ -59,16 +59,16 @@
       },
     },
   };
-  // Réponse d'exemple contenant volontairement :
-  //  - un champ additionnel (`nickname`) → détection des champs non déclarés
-  //  - un `countryCode` sur 5 caractères au lieu de 2 → violation de maxLength
-  //  - un `code` en minuscules dans Error → violation du pattern (si on teste 404)
+  // Réponse d'exemple : respecte TOUTES les contraintes du schéma (type, format,
+  // minLength/maxLength, pattern, enum) pour que la validation passe. Seule
+  // violation volontaire : un champ additionnel `nickname` non déclaré → démontre
+  // la détection des champs additionnels.
   const EXAMPLE_RESPONSE = {
     id: 42,
     email: "alice@example.com",
     firstName: "Alice",
     lastName: "Martin",
-    countryCode: "FRANCE",
+    countryCode: "FR",
     role: "user",
     createdAt: "2026-04-15T10:00:00Z",
     nickname: "Ali",

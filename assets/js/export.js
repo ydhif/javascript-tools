@@ -154,8 +154,23 @@ window.ToolExport = (function () {
     }
 
     // Inliner TOUS les scripts locaux restants automatiquement.
-    // On les déplace à la fin du <body> : comme ça le DOM est complet quand ils
-    // s'exécutent, et la sémantique `defer` est naturellement respectée.
+    // On les déplace à la fin du <body>. Problème : les tools font tous
+    // `document.addEventListener("DOMContentLoaded", ...)` pour câbler leurs
+    // handlers. Dans le standalone, DCL a déjà été émis au moment où nos
+    // scripts inlinés s'exécutent → les listeners ne se déclenchent jamais.
+    // Solution : patcher `document.addEventListener` via un shim injecté avant
+    // les scripts, pour que tout listener DOMContentLoaded soit exécuté
+    // immédiatement si DCL est déjà passé.
+    const shim = doc.createElement("script");
+    shim.textContent =
+      "(function(){if(document.readyState!=='loading'){" +
+      "var _origAddEL=document.addEventListener.bind(document);" +
+      "document.addEventListener=function(type,listener,opts){" +
+      "if(type==='DOMContentLoaded'){try{listener();}catch(e){console.error('[standalone] DCL handler error:',e);}}" +
+      "else{_origAddEL(type,listener,opts);}};" +
+      "}})();";
+    doc.body.appendChild(shim);
+
     const localScripts = Array.from(doc.querySelectorAll("script[src]")).filter((s) => {
       const src = s.getAttribute("src") || "";
       return !/^https?:\/\//i.test(src) && !/^\/\//.test(src);
@@ -167,13 +182,7 @@ window.ToolExport = (function () {
         if (!res.ok) { tag.remove(); continue; }
         const code = await res.text();
         const inline = doc.createElement("script");
-        // Wrapper qui gère les deux cas : DOM déjà chargé ou pas encore.
-        // Même si l'inline script est placé en fin de body (DOM ready), cela rend
-        // le code résilient si un outil a du code qui s'attend à DOMContentLoaded.
-        inline.textContent =
-          "(function(){function __run(){\n" +
-          code +
-          "\n}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',__run);}else{__run();}})();";
+        inline.textContent = code;
         tag.remove();
         doc.body.appendChild(inline);
       } catch (_) { tag.remove(); }
