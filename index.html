@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/styles.css" />
+  <script src="./assets/js/tools.js" defer></script>
+  <script src="./assets/js/menu.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">JavaScript Tools</h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-14">
+    <div class="animate-in mb-10">
+      <span class="badge" style="background: rgba(79, 70, 229, 0.12); color: #4338ca;">Boîte à outils 100% client</span>
+      <h2 class="page-title mt-3">Des outils rapides, sans backend.</h2>
+      <p class="page-subtitle mt-3">
+        Une collection d'utilitaires pour les développeurs, exécutés entièrement dans votre navigateur.
+        Aucune donnée n'est envoyée à un serveur.
+      </p>
+    </div>
+    <div id="tools-grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 animate-in"></div>
+  </main>
+
+  <footer class="app-footer">
+    Déployé sur GitHub Pages · Fait avec Tailwind + Inter
+  </footer>
+</body>
+</html>
