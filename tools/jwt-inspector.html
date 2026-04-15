@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JWT Inspector — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .jwt-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    @media (max-width: 900px) { .jwt-split { grid-template-columns: 1fr; } }
+    .jwt-token-break { word-break: break-all; font-family: "JetBrains Mono", monospace; font-size: 0.8rem; }
+    .jwt-header  { color: #be185d; }
+    .jwt-payload { color: #7c3aed; }
+    .jwt-sig     { color: #0284c7; }
+    pre.jwt-json {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      max-height: 400px; overflow: auto;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./jwt-inspector.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(139, 92, 246, 0.14); color: #6d28d9;">Auth</span>
+        <h2 class="page-title mt-3">JWT Inspector</h2>
+        <p class="page-subtitle mt-3">
+          Décode header + payload d'un JWT, met en évidence les claims standards,
+          et <b>vérifie la signature localement</b> via WebCrypto (HS*, RS*, ES*, PS*).
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Entrée</span>
+        <h3 class="font-bold text-lg">Token</h3>
+      </div>
+      <textarea id="token-input" rows="5" class="field field-mono"
+        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"></textarea>
+      <div id="token-colored" class="jwt-token-break mt-3 p-3 bg-slate-50 rounded border border-slate-200 hidden"></div>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button id="decode-btn" type="button" class="btn btn-primary">Décoder</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple (HS256)</button>
+        <button id="example-rs-btn" type="button" class="btn btn-ghost">Exemple (RS256)</button>
+        <div id="decode-status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="decoded-section" class="hidden card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Contenu</span>
+        <h3 class="font-bold text-lg">Décodage</h3>
+      </div>
+      <div id="alerts" class="mb-3"></div>
+      <div class="jwt-split">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block jwt-header">Header</label>
+          <pre id="header-json" class="jwt-json"></pre>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block jwt-payload">Payload</label>
+          <pre id="payload-json" class="jwt-json"></pre>
+        </div>
+      </div>
+      <div id="claims-info" class="mt-4 text-xs"></div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #f3e8ff; color: #6d28d9;">Génération</span>
+        <h3 class="font-bold text-lg">Signer un JWT</h3>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Header (JSON)</label>
+          <textarea id="gen-header" rows="4" class="field field-mono">{
+  "alg": "HS256",
+  "typ": "JWT"
+}</textarea>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-700 mb-1 block">Payload (JSON)</label>
+          <textarea id="gen-payload" rows="4" class="field field-mono">{
+  "sub": "1234567890",
+  "name": "John Doe",
+  "iat": 1516239022
+}</textarea>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">
+          Clé de signature
+          <span class="text-xs text-slate-500 font-normal">— secret pour HS*, PEM PKCS#8 ou JWK pour RS/ES/PS</span>
+        </label>
+        <textarea id="gen-key" rows="5" class="field field-mono"
+          placeholder="your-256-bit-secret (HS256) ou -----BEGIN PRIVATE KEY-----..."></textarea>
+      </div>
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button id="sign-btn" type="button" class="btn btn-primary">Signer</button>
+        <button id="genkey-btn" type="button" class="btn btn-ghost">Générer une clé</button>
+        <button id="gen-example-btn" type="button" class="btn btn-ghost">Exemple HS256</button>
+        <button id="gen-client-assertion-btn" type="button" class="btn btn-ghost">Exemple client_assertion</button>
+        <button id="use-as-token" type="button" class="btn btn-ghost">↑ Utiliser dans le décodeur</button>
+        <div id="sign-status" class="text-sm"></div>
+      </div>
+
+      <div id="gen-out-wrap" class="hidden mt-4">
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Token signé</label>
+        <pre id="gen-out" class="jwt-json" style="max-height: 180px;"></pre>
+      </div>
+    </section>
+
+    <section id="verify-section" class="hidden card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #fef3c7; color: #92400e;">Vérification</span>
+        <h3 class="font-bold text-lg">Signature</h3>
+      </div>
+      <div id="verify-hs" class="hidden">
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Secret (HMAC)</label>
+        <input id="hs-secret" type="text" class="field field-mono" placeholder="votre-secret" />
+      </div>
+      <div id="verify-asym" class="hidden">
+        <label class="text-sm font-semibold text-slate-700 mb-1 block">Clé publique (PEM ou JWK)</label>
+        <textarea id="asym-key" rows="8" class="field field-mono"
+          placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
+      </div>
+      <div class="mt-3 flex items-center gap-3">
+        <button id="verify-btn" type="button" class="btn btn-success">Vérifier la signature</button>
+        <div id="verify-status" class="text-sm"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · JWT Inspector</footer>
+</body>
+</html>

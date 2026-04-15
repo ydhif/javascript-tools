@@ -38,10 +38,12 @@
           type: "object",
           required: ["id", "email", "createdAt"],
           properties: {
-            id: { type: "integer", example: 42 },
-            email: { type: "string", format: "email", example: "alice@example.com" },
-            firstName: { type: "string", example: "Alice" },
-            lastName: { type: "string", example: "Martin" },
+            id: { type: "integer", minimum: 1, example: 42 },
+            email: { type: "string", format: "email", maxLength: 120, example: "alice@example.com" },
+            firstName: { type: "string", minLength: 1, maxLength: 50, example: "Alice" },
+            lastName:  { type: "string", minLength: 1, maxLength: 50, example: "Martin" },
+            // countryCode : code ISO 3166-1 alpha-2, exactement 2 caractères
+            countryCode: { type: "string", minLength: 2, maxLength: 2, example: "FR" },
             role: { type: "string", enum: ["admin", "user", "guest"], example: "user" },
             createdAt: { type: "string", format: "date-time" },
           },
@@ -50,18 +52,23 @@
           type: "object",
           required: ["code", "message"],
           properties: {
-            code: { type: "string", example: "NOT_FOUND" },
-            message: { type: "string", example: "User not found" },
+            code: { type: "string", pattern: "^[A-Z_]+$", maxLength: 32, example: "NOT_FOUND" },
+            message: { type: "string", maxLength: 500, example: "User not found" },
           },
         },
       },
     },
   };
+  // Réponse d'exemple contenant volontairement :
+  //  - un champ additionnel (`nickname`) → détection des champs non déclarés
+  //  - un `countryCode` sur 5 caractères au lieu de 2 → violation de maxLength
+  //  - un `code` en minuscules dans Error → violation du pattern (si on teste 404)
   const EXAMPLE_RESPONSE = {
     id: 42,
     email: "alice@example.com",
     firstName: "Alice",
     lastName: "Martin",
+    countryCode: "FRANCE",
     role: "user",
     createdAt: "2026-04-15T10:00:00Z",
     nickname: "Ali",
@@ -342,10 +349,16 @@
   }
 
   function validate() {
-    const respText = document.getElementById("resp-input").value.trim();
     const resultEl = document.getElementById("result");
     resultEl.classList.remove("hidden");
     resultEl.innerHTML = "";
+    if (typeof window.Ajv !== "function") {
+      resultEl.innerHTML =
+        '<div class="alert alert-warn">Chargement de la bibliothèque Ajv en cours, réessayez dans un instant…</div>';
+      window.addEventListener("ajv-ready", () => validate(), { once: true });
+      return;
+    }
+    const respText = document.getElementById("resp-input").value.trim();
     if (!respText) {
       resultEl.innerHTML = '<div class="text-red-700">Veuillez coller une réponse JSON.</div>';
       return;

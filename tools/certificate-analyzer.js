@@ -23,6 +23,90 @@
 
   // Cache : on ne regénère chaque variante qu'une seule fois.
   const examplePemCache = new Map();
+  let exampleChainCache = null;
+
+  // Construit une chaîne d'exemple : Root CA (self-signed) → Intermediate CA → Leaf.
+  // Le leaf est signé par l'intermédiaire, qui est lui-même signé par la racine.
+  function buildExampleChain() {
+    if (exampleChainCache) return exampleChainCache;
+
+    function makeCert(opts) {
+      const keys = forge.pki.rsa.generateKeyPair(2048);
+      const cert = forge.pki.createCertificate();
+      cert.publicKey = keys.publicKey;
+      cert.serialNumber = "0" + Math.floor(Math.random() * 1e15).toString(16);
+      cert.validity.notBefore = new Date();
+      cert.validity.notAfter = new Date();
+      cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + (opts.years || 1));
+      cert.setSubject(opts.subject);
+      cert.setIssuer(opts.issuer || opts.subject);
+      cert.setExtensions(opts.extensions || []);
+      return { cert, keys };
+    }
+
+    // Racine auto-signée
+    const rootSubject = [
+      { name: "commonName", value: "Demo Root CA" },
+      { name: "countryName", value: "FR" },
+      { name: "organizationName", value: "JavaScript Tools Demo" },
+    ];
+    const root = makeCert({
+      subject: rootSubject,
+      years: 10,
+      extensions: [
+        { name: "basicConstraints", cA: true, pathLenConstraint: 2, critical: true },
+        { name: "keyUsage", keyCertSign: true, cRLSign: true, critical: true },
+      ],
+    });
+    root.cert.sign(root.keys.privateKey, forge.md.sha256.create());
+
+    // Intermédiaire signé par la racine
+    const interSubject = [
+      { name: "commonName", value: "Demo Intermediate CA" },
+      { name: "countryName", value: "FR" },
+      { name: "organizationName", value: "JavaScript Tools Demo" },
+    ];
+    const inter = makeCert({
+      subject: interSubject,
+      issuer: rootSubject,
+      years: 5,
+      extensions: [
+        { name: "basicConstraints", cA: true, pathLenConstraint: 0, critical: true },
+        { name: "keyUsage", keyCertSign: true, cRLSign: true, critical: true },
+      ],
+    });
+    inter.cert.sign(root.keys.privateKey, forge.md.sha256.create());
+
+    // Leaf (serveur + client) signé par l'intermédiaire
+    const leafSubject = [
+      { name: "commonName", value: "api.demo.example.com" },
+      { name: "countryName", value: "FR" },
+      { name: "organizationName", value: "JavaScript Tools Demo" },
+      { shortName: "OU", value: "Platform" },
+    ];
+    const leaf = makeCert({
+      subject: leafSubject,
+      issuer: interSubject,
+      years: 1,
+      extensions: [
+        { name: "basicConstraints", cA: false },
+        { name: "keyUsage", digitalSignature: true, keyEncipherment: true, critical: true },
+        { name: "extKeyUsage", serverAuth: true, clientAuth: true },
+        { name: "subjectAltName", altNames: [
+          { type: 2, value: "api.demo.example.com" },
+          { type: 2, value: "www.demo.example.com" },
+        ] },
+      ],
+    });
+    leaf.cert.sign(inter.keys.privateKey, forge.md.sha256.create());
+
+    // Ordre conventionnel : leaf → intermédiaire → racine
+    exampleChainCache =
+      forge.pki.certificateToPem(leaf.cert) +
+      forge.pki.certificateToPem(inter.cert) +
+      forge.pki.certificateToPem(root.cert);
+    return exampleChainCache;
+  }
 
   function buildExamplePem(variant) {
     if (examplePemCache.has(variant.label)) return examplePemCache.get(variant.label);
@@ -88,6 +172,21 @@
         }
       }, 10);
     });
+    document.getElementById("example-chain-btn").addEventListener("click", (e) => {
+      const btn = e.currentTarget;
+      const original = btn.textContent;
+      btn.textContent = "Génération…";
+      btn.disabled = true;
+      setTimeout(() => {
+        try {
+          document.getElementById("cert-input").value = buildExampleChain();
+          analyze();
+        } finally {
+          btn.textContent = original;
+          btn.disabled = false;
+        }
+      }, 10);
+    });
     document.getElementById("download-html").addEventListener("click", () => {
       ToolExport.downloadStandalone({
         filename: "certificate-analyzer.html",
@@ -115,29 +214,69 @@
       return;
     }
 
-    let cert;
+    let pems;
     try {
-      const pem = ensurePem(input);
-      cert = forge.pki.certificateFromPem(pem);
+      pems = splitPems(input);
     } catch (e) {
-      showError("Impossible de parser le certificat : " + e.message);
+      showError("Impossible de parser l'entrée : " + e.message);
+      return;
+    }
+    if (!pems.length) {
+      showError("Aucun certificat trouvé dans l'entrée.");
       return;
     }
 
-    const report = buildReport(cert);
-    lastReport = report;
-    renderReport(report);
+    const reports = [];
+    for (let i = 0; i < pems.length; i++) {
+      try {
+        const cert = forge.pki.certificateFromPem(pems[i]);
+        reports.push(buildReport(cert));
+      } catch (e) {
+        showError("Certificat #" + (i + 1) + " invalide : " + e.message);
+        return;
+      }
+    }
+
+    // Classification de la position de chaque cert dans la chaîne.
+    annotateChain(reports);
+    lastReport = reports;
+    renderChain(reports);
   }
 
-  function ensurePem(text) {
-    if (text.includes("BEGIN CERTIFICATE")) return text;
-    // Suppose une base64 brute.
+  // Découpe l'entrée en blocs PEM. Accepte aussi une base64 brute (un seul cert).
+  function splitPems(text) {
+    const re = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
+    const matches = text.match(re);
+    if (matches && matches.length) return matches;
+    // Fallback : base64 brut d'un seul certificat
     const cleaned = text.replace(/\s+/g, "");
-    return (
+    if (!cleaned) return [];
+    const wrapped =
       "-----BEGIN CERTIFICATE-----\n" +
       cleaned.match(/.{1,64}/g).join("\n") +
-      "\n-----END CERTIFICATE-----\n"
-    );
+      "\n-----END CERTIFICATE-----\n";
+    return [wrapped];
+  }
+
+  // Détermine pour chaque cert son rôle dans la chaîne (leaf / intermediate / root)
+  // et si la liaison avec le cert suivant est cohérente (issuer du cert N = subject du cert N+1).
+  function annotateChain(reports) {
+    const n = reports.length;
+    reports.forEach((r, i) => {
+      const isSelfSigned = r.subject === r.issuer;
+      if (n === 1) {
+        r.chainRole = isSelfSigned ? "self-signed" : "single";
+      } else if (i === 0) {
+        r.chainRole = "leaf";
+      } else if (i === n - 1) {
+        r.chainRole = isSelfSigned ? "root" : "top";
+      } else {
+        r.chainRole = "intermediate";
+      }
+      if (i < n - 1) {
+        r.chainLinkOk = reports[i + 1].subject === r.issuer;
+      }
+    });
   }
 
   function buildReport(cert) {
@@ -254,29 +393,50 @@
     el.classList.remove("hidden");
   }
 
-  function renderReport(r) {
+  const ROLE_LABEL = {
+    "single":     { label: "Certificat unique",       color: "#4338ca", bg: "#eef2ff" },
+    "self-signed":{ label: "Certificat self-signed",  color: "#c2410c", bg: "#fff7ed" },
+    "leaf":       { label: "Feuille (leaf)",          color: "#4338ca", bg: "#eef2ff" },
+    "intermediate":{ label: "Intermédiaire",          color: "#6d28d9", bg: "#f3e8ff" },
+    "root":       { label: "Racine (self-signed)",    color: "#047857", bg: "#ecfdf5" },
+    "top":        { label: "Dernier de la chaîne",    color: "#c2410c", bg: "#fff7ed" },
+  };
+
+  function renderChain(reports) {
     const el = document.getElementById("result");
     el.classList.remove("hidden");
     el.innerHTML = "";
 
-    const alertClass = {
-      blue: "alert alert-info",
-      indigo: "alert alert-info",
-      purple: "alert alert-info",
-      amber: "alert alert-warn",
-      slate: "alert alert-info",
-    }[r.ekuClassification.color] || "alert alert-info";
+    // Résumé de chaîne si plus d'un certificat
+    if (reports.length > 1) {
+      const banner = document.createElement("div");
+      banner.className = "alert alert-info";
+      const brokenLinks = reports.slice(0, -1).filter((r) => r.chainLinkOk === false).length;
+      banner.innerHTML =
+        '<div class="text-xs uppercase tracking-wide font-semibold">Chaîne de certificats</div>' +
+        '<div class="text-lg font-bold">' + reports.length + " certificats détectés</div>" +
+        '<div class="text-sm mt-1">Ordre attendu : feuille → intermédiaires → racine. ' +
+        (brokenLinks === 0
+          ? "Tous les liens issuer ↔ subject sont cohérents."
+          : '<span class="text-red-700 font-semibold">' + brokenLinks + " lien(s) incohérent(s) détecté(s)</span>") +
+        "</div>";
+      el.appendChild(banner);
+    }
 
-    const ekuBadge = `
-      <div class="${alertClass}">
-        <div class="text-xs uppercase tracking-wide font-semibold">Extended Key Usage</div>
-        <div class="text-lg font-bold">${escapeHtml(r.ekuClassification.label)}</div>
-        <div class="text-sm mt-1">${
-          r.eku.length ? r.eku.map(escapeHtml).join(", ") : "Aucun EKU déclaré dans le certificat"
-        }</div>
-      </div>`;
+    reports.forEach((r, i) => el.appendChild(renderReportCard(r, i, reports.length)));
 
-    const rows = [
+    ToolExport.attachActions(el, () => ({
+      title: "Analyse de certificat" + (reports.length > 1 ? " (chaîne)" : ""),
+      sections: reports.flatMap((r, i) => ([
+        { heading: (reports.length > 1 ? "Certificat #" + (i + 1) + " — " : "") + (ROLE_LABEL[r.chainRole]||{}).label,
+          text: r.ekuClassification.label },
+        { heading: "Détails", rows: reportRows(r) },
+      ])),
+    }));
+  }
+
+  function reportRows(r) {
+    return [
       ["Numéro de série", r.serialNumber],
       ["Version", "v" + r.version],
       ["Sujet", r.subject],
@@ -293,34 +453,64 @@
             ? ", pathLen=" + r.basicConstraints.pathLenConstraint : "")
         : "—"],
     ];
+  }
 
-    const table = `
-      <h3 class="text-lg font-bold mb-4 mt-2">Détails du certificat</h3>
-      <table class="kv-table">
-        <tbody>
-          ${rows.map((row) => `
-            <tr>
-              <td>${escapeHtml(row[0])}</td>
-              <td>${escapeHtml(String(row[1]))}</td>
-            </tr>`).join("")}
-        </tbody>
-      </table>`;
+  function renderReportCard(r, index, total) {
+    const card = document.createElement("div");
+    card.style.cssText = "margin-bottom: 1.25rem; border: 1px solid rgba(148,163,184,0.3); border-radius: 0.75rem; padding: 1.1rem 1.25rem; background: rgba(255,255,255,0.85);";
 
-    el.innerHTML = ekuBadge + table;
+    const alertClass = {
+      blue: "alert alert-info",
+      indigo: "alert alert-info",
+      purple: "alert alert-info",
+      amber: "alert alert-warn",
+      slate: "alert alert-info",
+    }[r.ekuClassification.color] || "alert alert-info";
 
-    ToolExport.attachActions(el, () => ({
-      title: "Analyse de certificat",
-      sections: [
-        {
-          heading: "Classification EKU",
-          text: r.ekuClassification.label,
-        },
-        {
-          heading: "Détails",
-          rows,
-        },
-      ],
-    }));
+    const role = ROLE_LABEL[r.chainRole] || ROLE_LABEL.single;
+    const header = document.createElement("div");
+    header.className = "flex items-center justify-between flex-wrap gap-2 mb-3";
+    header.innerHTML =
+      '<div class="flex items-center gap-2">' +
+        '<span class="badge" style="background:' + role.bg + ';color:' + role.color + ';">' +
+          (total > 1 ? "#" + (index + 1) + " · " : "") + escapeHtml(role.label) +
+        '</span>' +
+        '<span class="text-xs text-slate-500">' + escapeHtml(r.subject) + '</span>' +
+      '</div>' +
+      (r.chainLinkOk === false
+        ? '<span class="badge" style="background:#fef2f2;color:#b91c1c;">⚠ lien rompu avec le cert suivant</span>'
+        : '');
+    card.appendChild(header);
+
+    const ekuBadge = document.createElement("div");
+    ekuBadge.className = alertClass;
+    ekuBadge.innerHTML =
+      '<div class="text-xs uppercase tracking-wide font-semibold">Extended Key Usage</div>' +
+      '<div class="text-lg font-bold">' + escapeHtml(r.ekuClassification.label) + '</div>' +
+      '<div class="text-sm mt-1">' +
+        (r.eku.length ? r.eku.map(escapeHtml).join(", ") : "Aucun EKU déclaré dans le certificat") +
+      '</div>';
+    card.appendChild(ekuBadge);
+
+    const rows = reportRows(r);
+    const table = document.createElement("table");
+    table.className = "kv-table";
+    table.style.marginTop = "1rem";
+    const tbody = document.createElement("tbody");
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      const tdK = document.createElement("td");
+      const tdV = document.createElement("td");
+      tdK.textContent = row[0];
+      tdV.textContent = String(row[1]);
+      tr.appendChild(tdK);
+      tr.appendChild(tdV);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    card.appendChild(table);
+
+    return card;
   }
 
   function escapeHtml(s) {

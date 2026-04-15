@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSR Generator — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"
+          integrity="sha384-xE6n3RBMZWgwAhyzoIMfY7HN3oDBa/+HBwFFNyxsdY8kseup7C4Blx1yDzprEESV"
+          crossorigin="anonymous"></script>
+  <style>
+    .csr-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 700px) { .csr-grid { grid-template-columns: 1fr; } }
+    .csr-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    pre.csr-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.7rem; white-space: pre-wrap; word-break: break-all;
+      max-height: 320px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./csr-generator.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(16, 185, 129, 0.14); color: #047857;">PKI</span>
+        <h2 class="page-title mt-3">CSR Generator</h2>
+        <p class="page-subtitle mt-3">
+          Génère une paire RSA et une demande de signature de certificat (CSR / PKCS#10)
+          directement dans le navigateur. <b>La clé privée ne quitte jamais ton appareil</b>.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <div class="alert alert-info mb-6">
+      <b>Sécurité :</b> la génération et la signature sont 100% locales (node-forge). Aucun
+      appel réseau, aucune remontée de données. Vérifie-le dans les devtools si besoin.
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Configuration</span>
+        <h3 class="font-bold text-lg">Paramètres du CSR</h3>
+      </div>
+
+      <div class="csr-grid mb-3">
+        <div>
+          <label class="csr-label">Taille de clé RSA</label>
+          <select id="keysize" class="field">
+            <option value="2048">RSA 2048 (rapide)</option>
+            <option value="3072">RSA 3072</option>
+            <option value="4096">RSA 4096 (lent)</option>
+          </select>
+        </div>
+        <div>
+          <label class="csr-label">Algo de signature</label>
+          <select id="sigalg" class="field">
+            <option value="sha256">SHA-256</option>
+            <option value="sha384">SHA-384</option>
+            <option value="sha512">SHA-512</option>
+          </select>
+        </div>
+      </div>
+
+      <h4 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Subject</h4>
+      <div class="csr-grid">
+        <div>
+          <label class="csr-label">Common Name (CN) *</label>
+          <input id="cn" type="text" class="field field-mono" placeholder="example.com" />
+        </div>
+        <div>
+          <label class="csr-label">Organization (O)</label>
+          <input id="o" type="text" class="field field-mono" placeholder="Example Corp" />
+        </div>
+        <div>
+          <label class="csr-label">Organizational Unit (OU)</label>
+          <input id="ou" type="text" class="field field-mono" placeholder="IT" />
+        </div>
+        <div>
+          <label class="csr-label">Country (C, 2 lettres)</label>
+          <input id="c" type="text" class="field field-mono" placeholder="FR" maxlength="2" />
+        </div>
+        <div>
+          <label class="csr-label">State/Province (ST)</label>
+          <input id="st" type="text" class="field field-mono" placeholder="Île-de-France" />
+        </div>
+        <div>
+          <label class="csr-label">Locality (L)</label>
+          <input id="l" type="text" class="field field-mono" placeholder="Paris" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="csr-label">Email (optionnel)</label>
+          <input id="email" type="text" class="field field-mono" placeholder="admin@example.com" />
+        </div>
+      </div>
+
+      <h4 class="text-sm font-semibold text-slate-700 mt-4 mb-2">
+        Subject Alternative Names (SAN)
+      </h4>
+      <p class="text-xs text-slate-500 mb-2">
+        Un par ligne. Préfixe optionnel <code>dns:</code>, <code>ip:</code>, <code>email:</code>, <code>uri:</code>.
+        Par défaut : <code>dns:</code>.
+      </p>
+      <textarea id="sans" rows="4" class="field field-mono"
+        placeholder="example.com
+www.example.com
+ip:192.168.1.10
+email:admin@example.com"></textarea>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button id="gen-btn" type="button" class="btn btn-primary">Générer</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+        <div id="gen-status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="out-section" class="hidden card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
+        <h3 class="font-bold text-lg">Sortie</h3>
+      </div>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-1">
+          <label class="csr-label">CSR (PKCS#10, PEM)</label>
+          <div class="flex gap-2">
+            <button id="copy-csr" type="button" class="btn btn-ghost" style="padding:0.3rem 0.6rem;font-size:0.72rem;">Copier</button>
+            <button id="dl-csr" type="button" class="btn btn-ghost" style="padding:0.3rem 0.6rem;font-size:0.72rem;">.csr</button>
+          </div>
+        </div>
+        <pre id="csr-pem" class="csr-out"></pre>
+      </div>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-1">
+          <label class="csr-label">Clé privée RSA (PEM) — à conserver secrètement</label>
+          <div class="flex gap-2">
+            <button id="copy-key" type="button" class="btn btn-ghost" style="padding:0.3rem 0.6rem;font-size:0.72rem;">Copier</button>
+            <button id="dl-key" type="button" class="btn btn-ghost" style="padding:0.3rem 0.6rem;font-size:0.72rem;">.key</button>
+          </div>
+        </div>
+        <pre id="key-pem" class="csr-out"></pre>
+      </div>
+
+      <div>
+        <label class="csr-label">Relecture du CSR</label>
+        <div id="csr-readback" class="text-xs bg-slate-50 border border-slate-200 rounded p-3"></div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #fff7ed; color: #c2410c;">Décodage</span>
+        <h3 class="font-bold text-lg">Décoder un CSR existant</h3>
+      </div>
+      <textarea id="decode-input" rows="6" class="field field-mono"
+        placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----"></textarea>
+      <button id="decode-btn" type="button" class="btn btn-primary mt-3">Décoder</button>
+      <div id="decode-out" class="mt-3"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · CSR Generator</footer>
+</body>
+</html>

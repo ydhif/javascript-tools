@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XML Workbench — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .xw-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: stretch;
+      height: calc(100vh - 260px);
+      min-height: 560px;
+    }
+    @media (max-width: 900px) {
+      .xw-split { grid-template-columns: 1fr; height: auto; }
+    }
+    .xw-pane { display: flex; flex-direction: column; overflow: hidden; padding: 1.25rem; }
+    .xw-input { flex: 1; min-height: 0; resize: none; }
+    .xw-body { flex: 1; min-height: 0; overflow: auto;
+               font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.78rem;
+               background: #fff; border: 1px solid rgba(148, 163, 184, 0.25);
+               border-radius: 0.6rem; padding: 0.75rem; }
+
+    /* Tabs */
+    .xw-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(148, 163, 184, 0.3); }
+    .xw-tab {
+      padding: 0.45rem 0.9rem; font-size: 0.8rem; font-weight: 600;
+      color: #64748b; cursor: pointer; border-radius: 0.4rem 0.4rem 0 0;
+      border: 1px solid transparent; border-bottom: 0;
+    }
+    .xw-tab.active { background: #fff; color: #4338ca; border-color: rgba(148, 163, 184, 0.3); }
+    .xw-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
+    .xw-panel.active { display: flex; }
+
+    /* Tree */
+    .xw-tree { line-height: 1.55; }
+    .xw-node { padding-left: 1rem; position: relative; }
+    .xw-node::before {
+      content: ""; position: absolute; left: 0.3rem; top: 0; bottom: 0;
+      border-left: 1px dashed rgba(148, 163, 184, 0.35);
+    }
+    .xw-row { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 1px 0; border-radius: 3px; }
+    .xw-row:hover { background: rgba(99, 102, 241, 0.06); }
+    .xw-toggle { display:inline-block; width: 1rem; color:#64748b; cursor:pointer;
+                 font-size: 0.7rem; text-align: center; user-select: none; }
+    .xw-toggle.leaf { color: transparent; cursor: default; }
+    .xw-tag { color: #be185d; font-weight: 600; }
+    .xw-attr-name { color: #7c3aed; }
+    .xw-attr-val  { color: #047857; }
+    .xw-text { color: #334155; }
+    .xw-comment { color: #94a3b8; font-style: italic; }
+    .xw-count { color: #94a3b8; font-size: 0.7rem; margin-left: 0.35rem; }
+    .xw-preview { color: #94a3b8; font-style: italic; margin-left: 0.35rem; }
+
+    .xw-hit { background: #fef08a !important; outline: 2px solid #facc15; border-radius: 2px; }
+
+    /* Schema view */
+    .xs-box {
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      margin: 0.4rem 0 0.4rem 1rem;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+    }
+    .xs-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+    .xs-name { color: #be185d; font-weight: 700; cursor: pointer; }
+    .xs-name:hover { text-decoration: underline; }
+    .xs-type { color: #047857; font-size: 0.72rem; }
+    .xs-card { color: #6366f1; font-size: 0.68rem; font-weight: 600; }
+    .xs-compositor {
+      display: inline-block; padding: 0.05rem 0.4rem; border-radius: 3px;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .xs-seq  { background: #e0e7ff; color: #3730a3; }
+    .xs-cho  { background: #fef3c7; color: #92400e; }
+    .xs-all  { background: #dcfce7; color: #166534; }
+    .xs-attrs {
+      margin-top: 0.35rem; padding-top: 0.35rem;
+      border-top: 1px dashed rgba(148, 163, 184, 0.3);
+      font-size: 0.7rem; display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem;
+    }
+    .xs-attr-name { color: #7c3aed; font-weight: 600; }
+    .xs-attr-req  { color: #b91c1c; font-weight: 700; }
+    .xs-ref-hint { color: #94a3b8; font-size: 0.68rem; font-style: italic; }
+    .xs-root-title { font-weight: 700; color: #334155; margin: 0.6rem 0 0.2rem; font-size: 0.78rem; }
+    pre.xw-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
+      max-height: 100%; overflow: auto;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./xml-workbench.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(234, 88, 12, 0.14); color: #c2410c;">XML Tooling</span>
+        <h2 class="page-title mt-3">XML Workbench</h2>
+        <p class="page-subtitle mt-3">
+          Équivalent léger de XMLSpy : parse / pretty-print, arbre interactif,
+          test XPath en live, transformation XSLT 1.0. 100% navigateur.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <div class="xw-split animate-in">
+      <!-- Gauche : entrée XML -->
+      <section class="card xw-pane">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #eef2ff; color: #4338ca;">Source</span>
+          <h3 class="font-bold text-lg">XML</h3>
+        </div>
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <button id="parse-btn" type="button" class="btn btn-primary">Analyser</button>
+          <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+          <button id="pretty-btn" type="button" class="btn btn-ghost">Pretty</button>
+          <button id="minify-btn" type="button" class="btn btn-ghost">Minify</button>
+        </div>
+        <textarea id="xml-input" class="field field-mono xw-input"
+          placeholder='<?xml version="1.0"?><root><item id="1">Hello</item></root>'></textarea>
+        <div id="parse-status" class="text-sm mt-2"></div>
+      </section>
+
+      <!-- Droite : tabs -->
+      <section class="card xw-pane">
+        <div class="xw-tabs">
+          <div class="xw-tab active" data-tab="tree">Arbre</div>
+          <div class="xw-tab" data-tab="xpath">XPath</div>
+          <div class="xw-tab" data-tab="xslt">XSLT</div>
+          <div class="xw-tab" data-tab="schema">Schema</div>
+        </div>
+
+        <div class="xw-panel active" data-panel="tree">
+          <div id="tree" class="xw-body xw-tree"></div>
+        </div>
+
+        <div class="xw-panel" data-panel="xpath">
+          <div class="mb-2 flex gap-2">
+            <input id="xpath-input" type="text" class="field field-mono"
+              placeholder="Expression XPath 1.0, ex : //item[@id='1']" />
+            <button id="xpath-run" type="button" class="btn btn-primary">Évaluer</button>
+          </div>
+          <div id="xpath-stats" class="text-xs text-slate-500 mb-2"></div>
+          <div id="xpath-results" class="xw-body"></div>
+        </div>
+
+        <div class="xw-panel" data-panel="xslt">
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Feuille XSLT 1.0</label>
+          <textarea id="xslt-input" class="field field-mono" rows="8"
+            placeholder='<?xml version="1.0"?><xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">...</xsl:stylesheet>'></textarea>
+          <div class="mt-2 mb-2 flex gap-2">
+            <button id="xslt-run" type="button" class="btn btn-primary">Transformer</button>
+            <button id="xslt-example" type="button" class="btn btn-ghost">Exemple XSLT</button>
+          </div>
+          <pre id="xslt-output" class="xw-out" style="flex:1; min-height: 0;"></pre>
+        </div>
+
+        <div class="xw-panel" data-panel="schema">
+          <div class="mb-2 flex items-center gap-2 flex-wrap">
+            <button id="schema-load" type="button" class="btn btn-primary">Charger le XSD depuis la source</button>
+            <button id="schema-example" type="button" class="btn btn-ghost">Exemple XSD</button>
+            <div id="schema-status" class="text-xs text-slate-500"></div>
+          </div>
+          <div id="schema-view" class="xw-body" style="font-size: 0.8rem;"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · XML Workbench</footer>
+</body>
+</html>

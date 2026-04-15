@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OIDC Logout URL Builder — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .lo-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    .lo-desc  { font-size: 0.68rem; color: #94a3b8; font-weight: 400; }
+    pre.lo-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.72rem; white-space: pre-wrap; word-break: break-all;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      max-height: 220px; overflow: auto;
+    }
+    .lo-hint-box {
+      background: #eff6ff; border-left: 4px solid #3b82f6;
+      padding: 0.6rem 0.85rem; border-radius: 0.4rem;
+      font-size: 0.75rem; color: #1e3a8a; margin-top: 0.5rem;
+    }
+    .lo-hint-box code { background: rgba(255,255,255,0.6); padding: 0 0.25rem; border-radius: 0.2rem; }
+    .lo-param-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.78rem; }
+    .lo-param-table th {
+      text-align: left; padding: 0.55rem 0.75rem; background: #f8fafc;
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 600; color: var(--ink-soft);
+      border-bottom: 1px solid rgba(148,163,184,0.3);
+    }
+    .lo-param-table td {
+      padding: 0.45rem 0.75rem; border-bottom: 1px solid rgba(148,163,184,0.18);
+      vertical-align: top;
+    }
+    .lo-param-key {
+      font-family: "JetBrains Mono", monospace; font-weight: 600;
+      color: #4338ca; font-size: 0.75rem; white-space: nowrap;
+    }
+    .lo-param-val {
+      font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+      color: var(--ink); word-break: break-all;
+    }
+    .lo-param-desc { font-size: 0.68rem; color: var(--ink-soft); line-height: 1.35; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./oidc-logout.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">OIDC</span>
+        <h2 class="page-title mt-3">OIDC Logout URL Builder</h2>
+        <p class="page-subtitle mt-3">
+          Construit l'URL de <b>RP-Initiated Logout</b> (OIDC Session Management 1.0) :
+          <code>end_session_endpoint</code> + <code>id_token_hint</code> +
+          <code>post_logout_redirect_uri</code>. Décode automatiquement l'id_token pour
+          vérifier qu'il n'est pas expiré et afficher le sujet.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in" style="border: 1px solid rgba(27, 94, 59, 0.3); background: linear-gradient(180deg, rgba(230, 244, 236, 0.4), rgba(255,255,255,1));">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #dcfce7; color: #166534;">Keycloak</span>
+        <h3 class="font-bold text-lg">Setup rapide Keycloak</h3>
+      </div>
+      <p class="text-xs text-slate-600 mb-3">
+        Pour Keycloak, l'endpoint est <code>&lt;base&gt;/realms/&lt;realm&gt;/protocol/openid-connect/logout</code>.
+      </p>
+      <div class="grid sm:grid-cols-[2fr_1fr_auto] gap-3">
+        <div>
+          <label class="lo-label">Base URL Keycloak</label>
+          <input id="kc-base" type="text" class="field field-mono"
+            placeholder="https://login.example.com" />
+        </div>
+        <div>
+          <label class="lo-label">Realm</label>
+          <input id="kc-realm" type="text" class="field field-mono" placeholder="master" />
+        </div>
+        <div class="flex items-end">
+          <button id="kc-apply" type="button" class="btn btn-primary" style="padding:0.7rem 1rem;">Appliquer</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Paramètres</span>
+        <h3 class="font-bold text-lg">Requête de logout</h3>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="sm:col-span-2">
+          <label class="lo-label">end_session_endpoint
+            <span class="lo-desc">— récupéré via Discovery (auto-rempli par Keycloak)</span>
+          </label>
+          <input id="end-session" type="text" class="field field-mono"
+            placeholder="https://login.example.com/realms/master/protocol/openid-connect/logout" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="lo-label">id_token_hint
+            <span class="lo-desc">— l'id_token reçu lors du login (preuve de qui se déconnecte)</span>
+          </label>
+          <textarea id="id-token-hint" rows="3" class="field field-mono"
+            placeholder="eyJhbGci..."></textarea>
+          <div id="id-token-info" class="text-xs mt-1"></div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="lo-label">post_logout_redirect_uri
+            <span class="lo-desc">— doit être enregistré côté IdP, comme redirect_uri</span>
+          </label>
+          <input id="post-redirect" type="text" class="field field-mono"
+            placeholder="http://localhost:4200/" />
+        </div>
+        <div>
+          <label class="lo-label">state
+            <span class="lo-desc">— aléatoire, auto-généré</span>
+          </label>
+          <input id="state" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="lo-label">client_id
+            <span class="lo-desc">— optionnel, Keycloak et certains IdPs l'utilisent</span>
+          </label>
+          <input id="client-id" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="lo-label">ui_locales
+            <span class="lo-desc">— BCP 47, optionnel</span>
+          </label>
+          <input id="ui-locales" type="text" class="field field-mono" placeholder="fr-FR fr en" />
+        </div>
+        <div>
+          <label class="lo-label">logout_hint
+            <span class="lo-desc">— Keycloak : info à afficher sur la page de confirmation</span>
+          </label>
+          <input id="logout-hint" type="text" class="field field-mono" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button id="build-btn" type="button" class="btn btn-primary">Construire l'URL</button>
+        <button id="regen-state" type="button" class="btn btn-ghost">Régénérer state</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple Keycloak</button>
+      </div>
+    </section>
+
+    <section id="output" class="hidden card animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #fef3c7; color: #92400e;">Résultat</span>
+        <h3 class="font-bold text-lg">URL de logout</h3>
+      </div>
+
+      <label class="lo-label">URL finale</label>
+      <pre id="final-url" class="lo-out" style="max-height: 140px;"></pre>
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button id="copy-url" type="button" class="btn btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.75rem;">Copier l'URL</button>
+        <button id="open-url" type="button" class="btn btn-primary" style="padding:0.35rem 0.9rem;font-size:0.75rem;">Ouvrir dans un nouvel onglet ↗</button>
+      </div>
+
+      <div class="mt-5">
+        <label class="lo-label">Paramètres décomposés</label>
+        <div class="overflow-x-auto">
+          <table id="params-table" class="lo-param-table"></table>
+        </div>
+      </div>
+
+      <div class="lo-hint-box mt-4">
+        <b>Bon à savoir :</b> l'<code>id_token_hint</code> est la façon <i>forte</i> de prouver à l'IdP
+        qui se déconnecte — il évite à l'utilisateur de reconfirmer "voulez-vous vraiment vous
+        déconnecter ?". Keycloak depuis v18 exige <code>id_token_hint</code> ou <code>client_id</code>
+        pour éviter la page de confirmation. Si ton id_token est expiré, utilise plutôt
+        <code>client_id</code> + <code>logout_hint</code>.
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · OIDC Logout URL Builder</footer>
+</body>
+</html>

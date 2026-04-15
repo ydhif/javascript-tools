@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TextDiff — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"
+          integrity="sha384-lJJVaUgxmk/PVfQnAsGN1QuJZrE+n6bg2EMu33yVZOJ2av/3UzTHbmnPCI7ENJYa"
+          crossorigin="anonymous"></script>
+  <style>
+    .td-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 900px) { .td-split { grid-template-columns: 1fr; } }
+    .td-input {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+    }
+    .td-view {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 0.6rem;
+      overflow: auto;
+      max-height: 70vh;
+      background: #fff;
+    }
+    .td-table { width: 100%; border-collapse: collapse; }
+    .td-table td {
+      vertical-align: top;
+      padding: 2px 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .td-gutter {
+      width: 3rem;
+      text-align: right;
+      color: #94a3b8;
+      user-select: none;
+      background: #f8fafc;
+      border-right: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .td-side { width: 50%; }
+    .td-row-add  { background: #ecfdf5; }
+    .td-row-add .td-gutter  { background: #d1fae5; color: #065f46; }
+    .td-row-del  { background: #fef2f2; }
+    .td-row-del .td-gutter  { background: #fee2e2; color: #7f1d1d; }
+    .td-row-mod-l { background: #fff7ed; }
+    .td-row-mod-l .td-gutter { background: #fed7aa; color: #7c2d12; }
+    .td-row-mod-r { background: #fffbeb; }
+    .td-row-mod-r .td-gutter { background: #fde68a; color: #78350f; }
+    .td-row-empty { background: #f1f5f9; }
+    .td-word-add { background: #6ee7b7; border-radius: 2px; padding: 0 1px; }
+    .td-word-del { background: #fca5a5; border-radius: 2px; padding: 0 1px; }
+    /* Mode unified */
+    .td-unified td.td-side { width: auto; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./text-diff.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(244, 114, 182, 0.14); color: #be185d;">Comparaison de texte</span>
+        <h2 class="page-title mt-3">TextDiff</h2>
+        <p class="page-subtitle mt-3">
+          Compare deux textes côte à côte, avec surlignage ligne et mot par mot.
+          100% local : rien n'est envoyé.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="td-split mb-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Texte A (original)</label>
+          <textarea id="text-a" class="field field-mono td-input"
+            placeholder="Colle ici le texte original..."></textarea>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Texte B (modifié)</label>
+          <textarea id="text-b" class="field field-mono td-input"
+            placeholder="Colle ici le texte modifié..."></textarea>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="diff-btn" type="button" class="btn btn-primary">Comparer</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+        <button id="swap-btn" type="button" class="btn btn-ghost">↔ Inverser</button>
+        <div class="border-l border-slate-300 h-6"></div>
+        <label class="text-sm flex items-center gap-1.5">
+          <input type="checkbox" id="mode-unified" /> Vue unifiée
+        </label>
+        <label class="text-sm flex items-center gap-1.5">
+          <input type="checkbox" id="ign-ws" /> Ignorer espaces
+        </label>
+        <label class="text-sm flex items-center gap-1.5">
+          <input type="checkbox" id="ign-case" /> Ignorer casse
+        </label>
+      </div>
+    </section>
+
+    <section id="result-section" class="hidden card animate-in">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
+          <h3 class="font-bold text-lg">Différences</h3>
+        </div>
+        <div id="diff-stats" class="text-xs text-slate-500"></div>
+      </div>
+      <div id="diff-view" class="td-view"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · TextDiff</footer>
+</body>
+</html>

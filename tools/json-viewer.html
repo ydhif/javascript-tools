@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON Viewer — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .jv-tree { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.8rem; line-height: 1.5; }
+    .jv-node { padding-left: 1.1rem; position: relative; }
+    .jv-node::before {
+      content: ""; position: absolute; left: 0.35rem; top: 0; bottom: 0;
+      border-left: 1px dashed rgba(148, 163, 184, 0.35);
+    }
+    .jv-row { display: flex; align-items: flex-start; gap: 0.35rem; padding: 1px 0; border-radius: 3px; }
+    .jv-row:hover { background: rgba(99, 102, 241, 0.06); }
+    .jv-toggle {
+      display: inline-block; width: 1rem; color: #64748b; cursor: pointer;
+      user-select: none; font-size: 0.7rem; text-align: center;
+    }
+    .jv-toggle.leaf { color: transparent; cursor: default; }
+    .jv-key { color: #be185d; cursor: pointer; }
+    .jv-key:hover { text-decoration: underline; }
+    .jv-colon { color: #64748b; margin: 0 0.25rem 0 0.1rem; }
+    .jv-string { color: #047857; }
+    .jv-number { color: #2563eb; }
+    .jv-boolean { color: #7c3aed; font-weight: 600; }
+    .jv-null { color: #94a3b8; font-style: italic; }
+    .jv-bracket { color: #475569; font-weight: 600; }
+    .jv-count { color: #94a3b8; font-size: 0.7rem; margin-left: 0.35rem; }
+    .jv-preview { color: #94a3b8; font-style: italic; margin-left: 0.35rem; }
+    .jv-hint {
+      display: inline-block; margin-left: 0.5rem; padding: 0 0.35rem;
+      font-size: 0.65rem; border-radius: 3px; background: #fef3c7; color: #92400e;
+      cursor: pointer;
+    }
+    .jv-hint:hover { background: #fde68a; }
+    .jv-url { color: #047857; text-decoration: underline; }
+    .jv-match { background: #fef08a; border-radius: 2px; }
+    .jv-close { padding-left: 1.35rem; color: #475569; font-weight: 600; }
+    .jv-path-bar {
+      font-family: "JetBrains Mono", monospace; font-size: 0.75rem;
+      background: #0f172a; color: #a5b4fc; padding: 0.5rem 0.85rem;
+      border-radius: 0.5rem; min-height: 2rem; word-break: break-all;
+    }
+    .jv-toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+      background: #0f172a; color: #fff; padding: 0.5rem 1rem; border-radius: 0.5rem;
+      font-size: 0.8rem; box-shadow: 0 10px 30px -8px rgba(0,0,0,0.3);
+      opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100;
+    }
+    .jv-toast.show { opacity: 1; }
+
+    /* Layout 2 colonnes pleine hauteur */
+    .jv-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: stretch;
+      height: calc(100vh - 260px);
+      min-height: 520px;
+    }
+    @media (max-width: 900px) {
+      .jv-split { grid-template-columns: 1fr; height: auto; }
+    }
+    .jv-pane {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 1.25rem;
+    }
+    .jv-input {
+      flex: 1;
+      min-height: 0;
+      resize: none;
+    }
+    .jv-tree-pane {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./json-viewer.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(59, 130, 246, 0.14); color: #1d4ed8;">Explorateur JSON</span>
+        <h2 class="page-title mt-3">JSON Viewer</h2>
+        <p class="page-subtitle mt-3">
+          Colle un JSON à gauche, explore-le à droite. Filtrage, copie du JSONPath,
+          détection de timestamps, base64 et JSON imbriqué.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <div class="jv-split animate-in">
+      <!-- Colonne gauche : entrée JSON -->
+      <section class="card jv-pane">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #eef2ff; color: #4338ca;">Source</span>
+          <h3 class="font-bold text-lg">JSON</h3>
+        </div>
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <button id="parse-btn" type="button" class="btn btn-primary">Analyser</button>
+          <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+          <button id="pretty-btn" type="button" class="btn btn-ghost">Pretty</button>
+          <button id="minify-btn" type="button" class="btn btn-ghost">Minify</button>
+        </div>
+        <textarea id="json-input" class="field field-mono jv-input"
+          placeholder='{"user": {"id": 42, "name": "Alice"}, "roles": ["admin", "editor"]}'></textarea>
+        <div id="parse-status" class="text-sm mt-2"></div>
+      </section>
+
+      <!-- Colonne droite : exploration -->
+      <section class="card jv-pane">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="badge" style="background: #ecfdf5; color: #047857;">Arbre</span>
+            <h3 class="font-bold text-lg">Exploration</h3>
+          </div>
+          <div class="flex gap-2">
+            <button id="expand-all" type="button" class="btn btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.75rem;">Tout déplier</button>
+            <button id="collapse-all" type="button" class="btn btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.75rem;">Tout replier</button>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-[1fr_auto] gap-2 mb-3">
+          <input id="filter-input" type="text" class="field field-mono"
+            placeholder="Filtrer par clé ou valeur..." />
+          <select id="filter-mode" class="field">
+            <option value="both">Clé + valeur</option>
+            <option value="key">Clé</option>
+            <option value="value">Valeur</option>
+          </select>
+        </div>
+
+        <div id="path-bar" class="jv-path-bar mb-2">—</div>
+
+        <div id="tree" class="jv-tree jv-tree-pane bg-white/70 rounded-lg p-3 border border-slate-200"></div>
+
+        <div id="stats" class="text-xs text-slate-500 mt-2"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="jv-toast"></div>
+
+  <footer class="app-footer">JavaScript Tools · JSON Viewer</footer>
+</body>
+</html>

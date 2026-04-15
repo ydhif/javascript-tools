@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PKCE &amp; Authz URL Builder — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .pk-label {
+      font-size: 0.78rem; font-weight: 600; color: #334155;
+      margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .pk-label-desc {
+      font-size: 0.68rem; color: #94a3b8; font-weight: 400;
+    }
+    pre.pk-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.72rem; white-space: pre-wrap; word-break: break-all;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      max-height: 220px; overflow: auto;
+    }
+    .pk-param-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.78rem; }
+    .pk-param-table th {
+      text-align: left; padding: 0.55rem 0.75rem; background: #f8fafc;
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 600; color: var(--ink-soft);
+      border-bottom: 1px solid rgba(148,163,184,0.3);
+    }
+    .pk-param-table td {
+      padding: 0.45rem 0.75rem; border-bottom: 1px solid rgba(148,163,184,0.18);
+      vertical-align: top;
+    }
+    .pk-param-key {
+      font-family: "JetBrains Mono", monospace; font-weight: 600;
+      color: #4338ca; font-size: 0.75rem; white-space: nowrap;
+    }
+    .pk-param-val {
+      font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+      color: var(--ink); word-break: break-all;
+    }
+    .pk-param-desc { font-size: 0.68rem; color: var(--ink-soft); line-height: 1.35; }
+    .pk-mini {
+      display: inline-block; padding: 0.1rem 0.45rem;
+      background: #eef2ff; color: #4338ca;
+      border-radius: 0.3rem;
+      font-family: "JetBrains Mono", monospace; font-size: 0.65rem;
+      margin-left: 0.35rem;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./pkce-authz.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">OIDC</span>
+        <h2 class="page-title mt-3">PKCE &amp; Authz URL Builder</h2>
+        <p class="page-subtitle mt-3">
+          Génère un couple <code>code_verifier</code> / <code>code_challenge</code> (S256)
+          via WebCrypto et construit une URL d'autorisation OIDC complète, prête à ouvrir
+          pour déclencher un flow <code>response_type=code</code>.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #f3e8ff; color: #6d28d9;">Étape 1</span>
+        <h3 class="font-bold text-lg">PKCE (RFC 7636)</h3>
+      </div>
+      <p class="text-xs text-slate-500 mb-3">
+        Le <code>code_verifier</code> est un secret haute entropie que seul le client connaît.
+        Le <code>code_challenge</code> est <code>base64url(SHA-256(code_verifier))</code>,
+        envoyé dans la requête d'autorisation. Lors de l'échange du code contre un token,
+        le client prouve qu'il détient le <code>code_verifier</code>.
+      </p>
+
+      <div class="grid sm:grid-cols-[auto_1fr] gap-3 items-end mb-3">
+        <div>
+          <label class="pk-label">Longueur du verifier
+            <span class="pk-label-desc">43–128 caractères</span>
+          </label>
+          <select id="pkce-len" class="field">
+            <option value="43">43 (min)</option>
+            <option value="64" selected>64 (recommandé)</option>
+            <option value="96">96</option>
+            <option value="128">128 (max)</option>
+          </select>
+        </div>
+        <div class="flex gap-2 items-center">
+          <button id="pkce-regen" type="button" class="btn btn-primary">Régénérer</button>
+          <span class="text-xs text-slate-500">Régénère aussi state et nonce</span>
+        </div>
+      </div>
+
+      <label class="pk-label">code_verifier</label>
+      <pre id="pkce-verifier" class="pk-out" style="max-height: 100px;"></pre>
+
+      <label class="pk-label mt-3">code_challenge (S256)</label>
+      <pre id="pkce-challenge" class="pk-out" style="max-height: 80px;"></pre>
+    </section>
+
+    <section class="card mb-6 animate-in" style="border: 1px solid rgba(27, 94, 59, 0.3); background: linear-gradient(180deg, rgba(230, 244, 236, 0.4), rgba(255,255,255,1));">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #dcfce7; color: #166534;">Keycloak</span>
+        <h3 class="font-bold text-lg">Setup rapide Keycloak</h3>
+      </div>
+      <p class="text-xs text-slate-600 mb-3">
+        Si tu utilises Keycloak comme IdP de fédération, entre sa base URL et le realm —
+        les endpoints sont calculés automatiquement. Optionnel : <code>kc_idp_hint</code>
+        pour sauter la page de login Keycloak et rediriger directement vers un IdP broker
+        (Google, AD, SAML, etc.).
+      </p>
+      <div class="grid sm:grid-cols-[2fr_1fr_1fr_auto] gap-3">
+        <div>
+          <label class="pk-label">Base URL Keycloak</label>
+          <input id="kc-base" type="text" class="field field-mono"
+            placeholder="https://login.example.com" />
+        </div>
+        <div>
+          <label class="pk-label">Realm</label>
+          <input id="kc-realm" type="text" class="field field-mono" placeholder="master" />
+        </div>
+        <div>
+          <label class="pk-label">kc_idp_hint
+            <span class="pk-label-desc">alias du broker</span>
+          </label>
+          <input id="kc-idp-hint" type="text" class="field field-mono" placeholder="google" />
+        </div>
+        <div class="flex items-end">
+          <button id="kc-apply" type="button" class="btn btn-primary" style="padding:0.7rem 1rem;">Appliquer</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Étape 2</span>
+        <h3 class="font-bold text-lg">Paramètres du client</h3>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="pk-label">authorization_endpoint
+            <span class="pk-label-desc">auto-rempli via Keycloak ci-dessus</span>
+          </label>
+          <input id="authz-endpoint" type="text" class="field field-mono"
+            placeholder="https://login.example.com/realms/master/protocol/openid-connect/auth" />
+        </div>
+        <div>
+          <label class="pk-label">client_id</label>
+          <input id="client-id" type="text" class="field field-mono" placeholder="my-client-id" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="pk-label">redirect_uri
+            <span class="pk-label-desc">doit être enregistré côté IdP</span>
+          </label>
+          <input id="redirect-uri" type="text" class="field field-mono"
+            placeholder="http://localhost:3000/callback" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="pk-label">scope
+            <span class="pk-label-desc"><code>openid</code> obligatoire pour OIDC</span>
+          </label>
+          <input id="scope" type="text" class="field field-mono" value="openid profile email" />
+        </div>
+        <div>
+          <label class="pk-label">response_type</label>
+          <select id="response-type" class="field">
+            <option value="code">code (authorization code + PKCE — recommandé)</option>
+            <option value="id_token">id_token (implicit, déprécié)</option>
+            <option value="id_token token">id_token token (implicit, déprécié)</option>
+            <option value="code id_token">code id_token (hybrid)</option>
+          </select>
+        </div>
+        <div>
+          <label class="pk-label">response_mode
+            <span class="pk-label-desc">optionnel</span>
+          </label>
+          <select id="response-mode" class="field">
+            <option value="">— par défaut —</option>
+            <option value="query">query</option>
+            <option value="fragment">fragment</option>
+            <option value="form_post">form_post</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Étape 3</span>
+        <h3 class="font-bold text-lg">Paramètres optionnels</h3>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="pk-label">state
+            <span class="pk-label-desc">protection CSRF, généré automatiquement</span>
+          </label>
+          <input id="state" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="pk-label">nonce
+            <span class="pk-label-desc">lié à l'id_token pour binding</span>
+          </label>
+          <input id="nonce" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="pk-label">prompt</label>
+          <select id="prompt" class="field">
+            <option value="">— pas de prompt —</option>
+            <option value="none">none (SSO silencieux)</option>
+            <option value="login">login (force reauth)</option>
+            <option value="consent">consent (force consent)</option>
+            <option value="select_account">select_account</option>
+            <option value="login consent">login consent</option>
+          </select>
+        </div>
+        <div>
+          <label class="pk-label">max_age
+            <span class="pk-label-desc">secondes</span>
+          </label>
+          <input id="max-age" type="number" class="field field-mono" placeholder="3600" />
+        </div>
+        <div>
+          <label class="pk-label">login_hint
+            <span class="pk-label-desc">email ou username pré-rempli</span>
+          </label>
+          <input id="login-hint" type="text" class="field field-mono" placeholder="alice@example.com" />
+        </div>
+        <div>
+          <label class="pk-label">ui_locales
+            <span class="pk-label-desc">BCP 47, séparés par espaces</span>
+          </label>
+          <input id="ui-locales" type="text" class="field field-mono" placeholder="fr-FR fr en" />
+        </div>
+        <div>
+          <label class="pk-label">acr_values
+            <span class="pk-label-desc">niveaux d'assurance</span>
+          </label>
+          <input id="acr-values" type="text" class="field field-mono" placeholder="urn:mace:incommon:iap:silver" />
+        </div>
+        <div>
+          <label class="pk-label">audience
+            <span class="pk-label-desc">Auth0 / API resource</span>
+          </label>
+          <input id="audience" type="text" class="field field-mono" placeholder="https://api.example.com" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button id="build-btn" type="button" class="btn btn-primary">Construire l'URL</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple Keycloak</button>
+        <button id="example-auth0-btn" type="button" class="btn btn-ghost">Exemple Auth0</button>
+      </div>
+    </section>
+
+    <section id="output" class="hidden card animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #fef3c7; color: #92400e;">Résultat</span>
+        <h3 class="font-bold text-lg">URL d'autorisation</h3>
+      </div>
+
+      <label class="pk-label">URL finale</label>
+      <pre id="final-url" class="pk-out" style="max-height: 160px;"></pre>
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button id="copy-url" type="button" class="btn btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.75rem;">Copier l'URL</button>
+        <button id="open-url" type="button" class="btn btn-primary" style="padding:0.35rem 0.9rem;font-size:0.75rem;">Ouvrir dans un nouvel onglet ↗</button>
+      </div>
+
+      <div class="mt-5">
+        <label class="pk-label">Paramètres décomposés</label>
+        <div class="overflow-x-auto">
+          <table id="params-table" class="pk-param-table"></table>
+        </div>
+      </div>
+
+      <div class="mt-5 alert alert-info">
+        <div class="text-xs font-semibold uppercase tracking-wide mb-1">Prochaine étape</div>
+        <div class="text-sm">
+          Après la redirection vers <code>redirect_uri</code>, tu récupéreras un <code>code</code>.
+          Échange-le contre un token avec une requête POST vers <code>token_endpoint</code> en
+          envoyant le <code>code_verifier</code> (celui généré ci-dessus) dans le body —
+          pas le <code>code_challenge</code>. Utilise <b>Curl Helper</b> pour générer le script d'échange.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · PKCE &amp; Authz URL Builder</footer>
+</body>
+</html>

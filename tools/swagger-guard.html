@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SwaggerGuard — JavaScript Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -9,9 +10,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="../assets/css/styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ajv@8.12.0/dist/ajv.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ajv-formats@2.1.1/dist/ajv-formats.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"
+          integrity="sha384-+pxiN6T7yvpryuJmE1gM9PX7yQit15auDb+ZwwvJOd/4be2Cie5/IuVXgQb/S9du"
+          crossorigin="anonymous"></script>
+  <script type="module">
+    import Ajv from "https://esm.sh/ajv@8.12.0";
+    import addFormats from "https://esm.sh/ajv-formats@2.1.1";
+    window.Ajv = Ajv;
+    window.ajvFormats = addFormats;
+    window.dispatchEvent(new Event("ajv-ready"));
+  </script>
   <script src="../assets/js/tools.js" defer></script>
   <script src="../assets/js/menu.js" defer></script>
   <script src="../assets/js/export.js" defer></script>

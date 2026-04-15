@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HAR Analyzer — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    /* Styles spécifiques HAR Analyzer (repris sur la charte du site) */
+    .ha-step-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff; font-weight: 700; font-size: 0.78rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .ha-step-title { font-weight: 700; color: var(--ink); font-size: 0.95rem; }
+    .ha-step-line { flex: 1; height: 1px; background: rgba(148,163,184,0.3); }
+
+    .ha-dropzone {
+      border: 1.5px dashed rgba(148,163,184,0.5);
+      border-radius: 0.75rem;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(248,250,252,0.6);
+      transition: all 0.2s;
+      position: relative;
+    }
+    .ha-dropzone:hover { border-color: #6366f1; background: rgba(238,242,255,0.4); }
+    .ha-dropzone input[type=file] {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; cursor: pointer; font-size: 0;
+    }
+    .ha-dz-icon {
+      width: 42px; height: 42px; margin: 0 auto 0.6rem;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid rgba(148,163,184,0.4); border-radius: 0.5rem; background: #fff;
+    }
+
+    .ha-tabs {
+      display: flex; border: 1px solid rgba(148,163,184,0.3);
+      border-radius: 0.6rem; overflow: hidden; margin-bottom: 1rem;
+    }
+    .ha-tab {
+      flex: 1; padding: 0.65rem 1rem; font-size: 0.82rem; font-weight: 600;
+      background: #fff; color: var(--ink-soft); cursor: pointer;
+      border: 0; border-right: 1px solid rgba(148,163,184,0.25);
+      transition: background 0.15s, color 0.15s;
+    }
+    .ha-tab:last-child { border-right: 0; }
+    .ha-tab:hover { background: #f8fafc; }
+    .ha-tab.active {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+    }
+    .ha-tab-badge {
+      display: inline-block; background: #ec4899; color: #fff;
+      border-radius: 999px; padding: 1px 7px; font-size: 0.65rem;
+      margin-left: 0.35rem; font-weight: 700;
+    }
+
+    .ha-stats {
+      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.75rem; margin-bottom: 1rem;
+    }
+    @media (max-width: 700px) { .ha-stats { grid-template-columns: repeat(2, 1fr); } }
+    .ha-stat {
+      background: #fff; border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 0.6rem; padding: 0.85rem 1rem;
+    }
+    .ha-stat-val { font-size: 1.35rem; font-weight: 800; color: var(--ink);
+                   font-family: "JetBrains Mono", monospace; line-height: 1; }
+    .ha-stat-lbl { font-size: 0.65rem; color: var(--ink-soft);
+                   text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.3rem; font-weight: 600; }
+
+    .ha-table { width: 100%; border-collapse: separate; border-spacing: 0;
+                font-size: 0.78rem; font-family: "JetBrains Mono", monospace; }
+    .ha-table th {
+      text-align: left; padding: 0.55rem 0.8rem;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--ink-soft); font-weight: 600;
+      background: #f8fafc; border-bottom: 1px solid rgba(148,163,184,0.3);
+    }
+    .ha-table td {
+      padding: 0.45rem 0.8rem;
+      border-bottom: 1px solid rgba(148,163,184,0.18);
+      vertical-align: middle;
+    }
+    .ha-chip {
+      display: inline-flex; align-items: center; padding: 0.1rem 0.5rem;
+      border-radius: 999px; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .ha-canvas-wrap { position: relative; background: #fff;
+                      border: 1px solid rgba(148,163,184,0.25); border-radius: 0.6rem; padding: 0.75rem; }
+    .ha-tooltip {
+      display: none; position: fixed; background: #0f172a; color: #e2e8f0;
+      font-family: "JetBrains Mono", monospace; font-size: 0.7rem;
+      padding: 0.4rem 0.65rem; border-radius: 0.4rem; max-width: 520px;
+      word-break: break-all; line-height: 1.5; pointer-events: none; z-index: 9999;
+      box-shadow: 0 10px 25px -8px rgba(0,0,0,0.3);
+    }
+    .ha-puml-pre {
+      background: #0f172a; border-radius: 0.6rem; padding: 1rem 1.1rem;
+      position: relative; margin-bottom: 0.75rem;
+    }
+    .ha-puml-pre pre {
+      margin: 0; font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+      color: #e2e8f0; white-space: pre; overflow-x: auto; padding-right: 70px;
+    }
+    .ha-puml-copy {
+      position: absolute; top: 0.6rem; right: 0.6rem;
+      padding: 0.3rem 0.7rem; font-size: 0.7rem;
+      background: rgba(255,255,255,0.1); color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 0.3rem; cursor: pointer;
+    }
+    .ha-puml-copy:hover { background: rgba(255,255,255,0.18); }
+
+    .ha-token-card {
+      background: #fff; border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 0.75rem; margin-bottom: 1rem; overflow: hidden;
+    }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./har-viewer.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(234, 88, 12, 0.14); color: #c2410c;">OIDC / Réseau</span>
+        <h2 class="page-title mt-3">HAR Analyzer</h2>
+        <p class="page-subtitle mt-3">
+          Analyse un fichier <code>.har</code> pour reconstruire un flux OIDC
+          (App / Keycloak / IdP externe). Séquence, phases, requêtes, tokens JWT
+          avec vérification de signature via JWKS.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <div id="ha">
+      <!-- Step 1 -->
+      <section class="card mb-6 animate-in">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="ha-step-num">1</span>
+          <span class="ha-step-title">Fichier HAR</span>
+          <span class="ha-step-line"></span>
+        </div>
+        <div id="hd" class="ha-dropzone">
+          <input type="file" accept=".har,application/json" id="hfi" />
+          <div id="hil">
+            <div class="ha-dz-icon">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="#6366f1">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+              </svg>
+            </div>
+            <div class="font-semibold text-slate-800 text-sm">Déposer votre fichier HAR</div>
+            <div class="text-xs text-slate-500 mt-1">ou cliquer pour sélectionner — DevTools → Network → Save as HAR</div>
+            <div id="hprog-wrap" class="hidden mt-4">
+              <div class="flex items-center justify-between mb-1.5">
+                <span id="hprog-label" class="text-xs font-medium text-indigo-700">Lecture du fichier…</span>
+                <span id="hprog-pct" class="text-xs font-semibold text-indigo-700">0%</span>
+              </div>
+              <div class="h-1.5 bg-slate-200 rounded overflow-hidden">
+                <div id="hprog-bar" class="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 rounded transition-all duration-100" style="width: 0%"></div>
+              </div>
+              <div id="hprog-sub" class="text-[10px] text-slate-400 mt-1 font-mono">0 Ko</div>
+            </div>
+          </div>
+          <div id="hld" class="hidden items-center justify-center gap-2">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#059669">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span id="hfn" class="text-sm font-semibold text-emerald-700"></span>
+            <span id="hrc" class="text-xs text-slate-500"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2 -->
+      <section id="hsh" class="card mb-6 animate-in hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="ha-step-num">2</span>
+          <span class="ha-step-title">Identifier les hôtes</span>
+          <span class="ha-step-line"></span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">
+          Le même hôte peut être choisi dans plusieurs rôles (ex : deux instances Keycloak en brokering).
+          Si Keycloak = IdP, le brokering est désactivé.
+        </p>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 rounded-full" style="background:#4f46e5"></span>App Angular
+            </label>
+            <select id="hha" class="field field-mono"><option value="">— sélectionner —</option></select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 rounded-full" style="background:#059669"></span>Keycloak
+            </label>
+            <select id="hhk" class="field field-mono"><option value="">— sélectionner —</option></select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1 flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 rounded-full" style="background:#c2410c"></span>IdP externe
+            </label>
+            <select id="hhi" class="field field-mono"><option value="">— sélectionner —</option></select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3 -->
+      <section id="hsb" class="card mb-6 animate-in hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="ha-step-num">3</span>
+          <span class="ha-step-title">Analyser</span>
+          <span class="ha-step-line"></span>
+        </div>
+        <div id="herr" class="alert alert-error hidden"></div>
+        <button id="hbtn" type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:0.85rem;">
+          Analyser le flux OIDC →
+        </button>
+      </section>
+
+      <!-- Results -->
+      <div id="hres" class="hidden">
+        <div id="hsr" class="ha-stats"></div>
+
+        <div class="ha-tabs">
+          <button type="button" id="htb-seq"    class="ha-tab active">Séquence</button>
+          <button type="button" id="htb-phases" class="ha-tab">Phases</button>
+          <button type="button" id="htb-reqs"   class="ha-tab">Requêtes</button>
+          <button type="button" id="htb-tokens" class="ha-tab">Tokens <span id="htb-tokens-badge" class="ha-tab-badge" style="display:none"></span></button>
+        </div>
+
+        <!-- Séquence -->
+        <section id="hp-seq" class="card animate-in">
+          <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="badge" style="background: #ecfdf5; color: #047857;">Diagramme</span>
+              <h3 class="font-bold text-base">Séquence OIDC</h3>
+            </div>
+            <button id="hpuml-btn" type="button" class="btn btn-ghost" style="padding:0.4rem 0.85rem;font-size:0.75rem;">
+              Exporter PlantUML
+            </button>
+          </div>
+          <div id="hpuml-pre" class="ha-puml-pre hidden">
+            <button id="hpuml-copy" type="button" class="ha-puml-copy">Copier</button>
+            <pre id="hpuml-code"></pre>
+          </div>
+          <div class="ha-canvas-wrap">
+            <canvas id="hcv" style="display:block;width:100%"></canvas>
+            <div id="hcv-tip" class="ha-tooltip"></div>
+          </div>
+        </section>
+
+        <!-- Phases -->
+        <section id="hp-phases" class="card animate-in hidden">
+          <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="badge" style="background: #eef2ff; color: #4338ca;">Temps</span>
+              <h3 class="font-bold text-base">Phases</h3>
+            </div>
+            <button id="hcopy-ph" type="button" class="btn btn-ghost" style="padding:0.4rem 0.85rem;font-size:0.75rem;">
+              Copier tableau (CSV)
+            </button>
+          </div>
+          <table id="hpt" class="ha-table"></table>
+        </section>
+
+        <!-- Requêtes -->
+        <section id="hp-reqs" class="card animate-in hidden">
+          <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="badge" style="background: #fef3c7; color: #92400e;">Liste</span>
+              <h3 class="font-bold text-base">Requêtes</h3>
+              <span class="text-xs text-slate-500 ml-2">Filtrer :</span>
+              <select id="hpf" class="field field-mono" style="width:auto;padding:0.35rem 0.6rem;">
+                <option value="all">Toutes</option>
+                <option value="app">app</option>
+                <option value="kc">kc</option>
+                <option value="idp">idp</option>
+                <option value="cb">cb</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+            <button id="hcopy-rq" type="button" class="btn btn-ghost" style="padding:0.4rem 0.85rem;font-size:0.75rem;">
+              Copier (CSV)
+            </button>
+          </div>
+          <div class="overflow-x-auto"><table id="hrt" class="ha-table"></table></div>
+        </section>
+
+        <!-- Tokens -->
+        <section id="hp-tokens" class="card animate-in hidden">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="badge" style="background: #f3e8ff; color: #6d28d9;">JWT</span>
+            <h3 class="font-bold text-base">Tokens détectés</h3>
+          </div>
+          <div id="htk-list"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · HAR Analyzer</footer>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OIDC Discovery Explorer — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .od-endpoint {
+      display: grid;
+      grid-template-columns: 230px 1fr auto;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.55rem 0.85rem;
+      border-bottom: 1px solid rgba(148,163,184,0.18);
+      font-size: 0.8rem;
+    }
+    .od-endpoint:last-child { border-bottom: 0; }
+    .od-endpoint-name {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: #4338ca;
+      font-weight: 600;
+    }
+    .od-endpoint-url {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--ink-soft);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .od-endpoint-missing { color: #94a3b8; font-style: italic; }
+
+    .od-cap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.85rem;
+    }
+    .od-cap-card {
+      background: #fff;
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 0.5rem;
+      padding: 0.75rem 0.9rem;
+    }
+    .od-cap-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 700;
+      color: #4338ca;
+      margin-bottom: 0.4rem;
+    }
+    .od-chip {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      background: #eef2ff;
+      color: #4338ca;
+      border-radius: 0.35rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin: 0.12rem 0.15rem 0.12rem 0;
+    }
+    .od-chip-warn { background: #fef3c7; color: #92400e; }
+    .od-chip-bad  { background: #fee2e2; color: #b91c1c; }
+    .od-chip-good { background: #dcfce7; color: #166534; }
+
+    .od-grade {
+      display: grid; gap: 0.4rem;
+    }
+    .od-grade-item {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.45rem;
+      font-size: 0.8rem;
+    }
+    .od-grade-ok   { background: #ecfdf5; color: #065f46; }
+    .od-grade-warn { background: #fffbeb; color: #78350f; }
+    .od-grade-bad  { background: #fef2f2; color: #7f1d1d; }
+    .od-grade-info { background: #eff6ff; color: #1e3a8a; }
+    .od-grade-icon { font-weight: 700; text-align: center; }
+
+    .od-jwk {
+      background: #fff;
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 0.5rem;
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.75rem;
+    }
+    .od-jwk-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.3rem;
+    }
+    .od-jwk-field {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 0.5rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.68rem;
+      padding: 0.1rem 0;
+    }
+    .od-jwk-field span:first-child { color: #7c3aed; font-weight: 600; }
+    .od-jwk-field span:last-child { color: var(--ink-soft); word-break: break-all; }
+
+    pre.od-raw {
+      background: #0f172a; color: #e2e8f0;
+      padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.72rem; white-space: pre-wrap; word-break: break-word;
+      max-height: 400px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .od-copy {
+      padding: 0.25rem 0.55rem;
+      background: #f1f5f9;
+      border: 1px solid rgba(148,163,184,0.3);
+      border-radius: 0.3rem;
+      font-size: 0.65rem;
+      font-family: "JetBrains Mono", monospace;
+      cursor: pointer;
+      color: var(--ink-soft);
+    }
+    .od-copy:hover { background: #e2e8f0; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./oidc-discovery.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">OIDC</span>
+        <h2 class="page-title mt-3">OIDC Discovery Explorer</h2>
+        <p class="page-subtitle mt-3">
+          Colle une URL d'issuer OIDC (Keycloak realm, Azure AD tenant, Auth0 domain, Google…),
+          récupère automatiquement la configuration <code>/.well-known/openid-configuration</code>
+          + le JWKS, et obtiens un audit de sécurité de la configuration.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in" style="border: 1px solid rgba(27, 94, 59, 0.3); background: linear-gradient(180deg, rgba(230, 244, 236, 0.4), rgba(255,255,255,1));">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #dcfce7; color: #166534;">Keycloak</span>
+        <h3 class="font-bold text-lg">Setup rapide Keycloak</h3>
+      </div>
+      <p class="text-xs text-slate-600 mb-3">
+        Entre la base URL de ton Keycloak et le nom du realm — on construit l'URL d'issuer pour toi.
+      </p>
+      <div class="grid sm:grid-cols-[2fr_1fr_auto] gap-3">
+        <div>
+          <label class="pk-label" style="font-size:0.78rem;font-weight:600;color:#334155;margin-bottom:0.25rem;display:block;">Base URL Keycloak</label>
+          <input id="kc-base" type="text" class="field field-mono"
+            placeholder="https://login.example.com" />
+        </div>
+        <div>
+          <label class="pk-label" style="font-size:0.78rem;font-weight:600;color:#334155;margin-bottom:0.25rem;display:block;">Realm</label>
+          <input id="kc-realm" type="text" class="field field-mono" placeholder="master" />
+        </div>
+        <div class="flex items-end">
+          <button id="kc-apply" type="button" class="btn btn-primary" style="padding:0.7rem 1rem;">Explorer ce realm</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Issuer</span>
+        <h3 class="font-bold text-lg">URL du provider</h3>
+      </div>
+      <p class="text-xs text-slate-500 mb-2">
+        Entre la racine de l'issuer (sans <code>/.well-known/...</code>, on l'ajoute automatiquement).
+        L'URL doit être en HTTPS.
+      </p>
+      <input id="issuer-input" type="text" class="field field-mono"
+        placeholder="https://login.example.com/realms/master" />
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button id="fetch-btn" type="button" class="btn btn-primary">Explorer</button>
+        <button id="paste-btn" type="button" class="btn btn-ghost">Coller le JSON manuellement</button>
+        <select id="preset-select" class="field field-mono" style="width: auto;">
+          <option value="">Exemples de providers…</option>
+          <option value="https://accounts.google.com">Google</option>
+          <option value="https://login.microsoftonline.com/common/v2.0">Microsoft (v2.0 common)</option>
+          <option value="https://appleid.apple.com">Apple</option>
+          <option value="https://gitlab.com">GitLab.com</option>
+          <option value="https://token.actions.githubusercontent.com">GitHub Actions OIDC</option>
+          <option value="https://dev-xxxxxx.us.auth0.com">Auth0 (placeholder — remplace dev-xxxxxx)</option>
+        </select>
+        <div id="fetch-status" class="text-sm"></div>
+      </div>
+
+      <div id="paste-wrap" class="hidden mt-4">
+        <label class="text-xs font-semibold text-slate-500 mb-1 block">
+          Coller la réponse <code>/.well-known/openid-configuration</code> (utile si le serveur bloque CORS)
+        </label>
+        <textarea id="paste-input" rows="6" class="field field-mono"
+          placeholder='{"issuer":"...","authorization_endpoint":"...",...}'></textarea>
+        <div class="mt-2">
+          <label class="text-xs font-semibold text-slate-500 mb-1 block">
+            Coller le JWKS (optionnel — sinon on tente de le fetch depuis <code>jwks_uri</code>)
+          </label>
+          <textarea id="paste-jwks" rows="4" class="field field-mono"
+            placeholder='{"keys":[...]}'></textarea>
+        </div>
+        <button id="parse-paste-btn" type="button" class="btn btn-primary mt-3">Analyser le JSON collé</button>
+      </div>
+    </section>
+
+    <section id="results" class="hidden">
+
+      <section id="keycloak-extras" class="hidden card mb-6 animate-in" style="border: 1px solid rgba(27, 94, 59, 0.3); background: linear-gradient(180deg, rgba(230, 244, 236, 0.4), rgba(255,255,255,1));">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #dcfce7; color: #166534;">Keycloak détecté</span>
+          <h3 class="font-bold text-lg">URLs spécifiques</h3>
+        </div>
+        <p class="text-xs text-slate-600 mb-3">
+          Cet issuer ressemble à un Keycloak. Voici les URLs non-OIDC utiles (consoles admin / account, brokering).
+        </p>
+        <div id="kc-extras-list"></div>
+      </section>
+
+      <section class="card mb-6 animate-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #ecfdf5; color: #047857;">Endpoints</span>
+          <h3 class="font-bold text-lg">URLs du provider</h3>
+        </div>
+        <div id="endpoints-list"></div>
+      </section>
+
+      <section class="card mb-6 animate-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #fef3c7; color: #92400e;">Audit</span>
+          <h3 class="font-bold text-lg">Grade de la configuration</h3>
+        </div>
+        <div id="grade" class="od-grade"></div>
+      </section>
+
+      <section class="card mb-6 animate-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #f3e8ff; color: #6d28d9;">Capacités</span>
+          <h3 class="font-bold text-lg">Fonctionnalités supportées</h3>
+        </div>
+        <div id="capabilities" class="od-cap-grid"></div>
+      </section>
+
+      <section class="card mb-6 animate-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #fff7ed; color: #c2410c;">JWKS</span>
+          <h3 class="font-bold text-lg">Clés de signature</h3>
+        </div>
+        <div id="jwks-status" class="text-xs text-slate-500 mb-2"></div>
+        <div id="jwks-list"></div>
+      </section>
+
+      <section class="card animate-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="badge" style="background: #f1f5f9; color: #334155;">Raw</span>
+          <h3 class="font-bold text-lg">Document de configuration brut</h3>
+        </div>
+        <pre id="raw-json" class="od-raw"></pre>
+      </section>
+
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · OIDC Discovery Explorer</footer>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Curl Helper — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .ch-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    @media (max-width: 900px) { .ch-grid { grid-template-columns: 1fr; } }
+    pre.ch-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.72rem; white-space: pre-wrap; word-break: break-word;
+      max-height: 300px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .ch-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    .ch-hint { font-size: 0.7rem; color: #64748b; }
+    .ch-placeholder { background: #fef3c7; color: #92400e; padding: 0 0.25rem; border-radius: 3px; font-weight: 600; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./curl-helper.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">OAuth2 helper</span>
+        <h2 class="page-title mt-3">Curl Helper</h2>
+        <p class="page-subtitle mt-3">
+          Génère un script <b>bash</b> qui récupère un token via
+          <b>client_credentials</b>, extrait <code>access_token</code> avec <code>jq</code>,
+          puis enchaîne la requête curl cible en injectant le token dans le header Authorization.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Configuration</span>
+        <h3 class="font-bold text-lg">Token OAuth2 + requête cible</h3>
+      </div>
+
+      <div class="ch-grid">
+        <div>
+          <label class="ch-label">Token endpoint</label>
+          <input id="token-url" type="text" class="field field-mono"
+            placeholder="https://login.example.com/oauth2/token" />
+        </div>
+        <div>
+          <label class="ch-label">Scope (optionnel)</label>
+          <input id="scope" type="text" class="field field-mono" placeholder="api://my-api/.default" />
+        </div>
+        <div>
+          <label class="ch-label">client_id</label>
+          <input id="client-id" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="ch-label">client_secret</label>
+          <input id="client-secret" type="password" class="field field-mono" />
+        </div>
+        <div>
+          <label class="ch-label">Audience (optionnel — Auth0)</label>
+          <input id="audience" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="ch-label">Auth method</label>
+          <select id="auth-method" class="field">
+            <option value="body">client_secret dans le body (standard)</option>
+            <option value="basic">Basic Auth (RFC 6749 §2.3.1)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="ch-label">Commande curl cible (utilise <span class="ch-placeholder">{{token}}</span> comme placeholder)</label>
+        <textarea id="curl-input" rows="5" class="field field-mono"
+          placeholder='curl -X GET "https://api.example.com/users/me" -H "Authorization: Bearer {{token}}"'></textarea>
+      </div>
+
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button id="go-btn" type="button" class="btn btn-primary">Générer le script bash</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+        <label class="text-sm flex items-center gap-1.5">
+          <input type="checkbox" id="opt-basic" /> Basic Auth
+        </label>
+        <label class="text-sm flex items-center gap-1.5">
+          <input type="checkbox" id="opt-env" checked /> Secrets via env vars
+        </label>
+        <div id="status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="output-section" class="hidden card animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
+        <h3 class="font-bold text-lg">Sortie</h3>
+      </div>
+
+      <label class="ch-label">Script bash généré</label>
+      <pre id="script-out" class="ch-out" style="max-height: 500px;"></pre>
+      <p class="ch-hint mt-2">
+        Utilise <code>curl</code> + <code>jq</code> pour extraire <code>access_token</code>.
+        Copie, colle dans un fichier <code>.sh</code>, <code>chmod +x</code>, et exécute.
+      </p>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · Curl Helper</footer>
+</body>
+</html>

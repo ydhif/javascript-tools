@@ -113,10 +113,13 @@ window.ToolExport = (function () {
   }
 
   // Construit une version autonome (single-file HTML) de la page courante.
-  // - Inline les scripts locaux (relatifs) listés dans `inlineScripts`.
-  // - Conserve les scripts CDN en <script src>.
-  // - Supprime la navigation inter-outils (header/menu) pour rendre le fichier indépendant.
-  async function downloadStandalone({ filename, inlineScripts, title }) {
+  // - Inline automatiquement TOUS les scripts locaux (relatifs) — export.js, menu.js
+  //   (pour la barre de recherche) et le script de l'outil.
+  // - Conserve les scripts et stylesheets CDN en <script src> / <link>.
+  // - Inline toutes les feuilles de style locales.
+  // - Retire le registre tools.js et le header inter-outils pour rendre le fichier
+  //   autonome (pas de dropdown catégories qui pointerait sur d'autres fichiers).
+  async function downloadStandalone({ filename, title }) {
     const htmlText = await (await fetch(window.location.href)).text();
     const doc = new DOMParser().parseFromString(htmlText, "text/html");
 
@@ -125,45 +128,55 @@ window.ToolExport = (function () {
       if (t) t.textContent = title;
     }
 
-    // Supprimer le header (contient le menu inter-outils).
+    // Supprimer le header (contient la barre de recherche et le menu inter-outils).
     const header = doc.querySelector("header");
     if (header) header.remove();
 
-    // Retirer les scripts qui construisent le menu / registre.
+    // Retirer tools.js et menu.js : ils n'ont plus de sens hors du projet (menu inter-outils).
     doc.querySelectorAll("script[src]").forEach((s) => {
       const src = s.getAttribute("src") || "";
-      if (src.includes("tools.js") || src.includes("menu.js")) {
-        s.remove();
-      }
+      if (/\/(tools|menu)\.js(\?|$)/.test(src)) s.remove();
     });
 
-    // Inliner les feuilles de style locales (chemins relatifs).
+    // Inliner TOUTES les feuilles de style locales (chemins relatifs).
     const styleLinks = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
     for (const link of styleLinks) {
       const href = link.getAttribute("href") || "";
-      if (/^https?:/.test(href)) continue; // on conserve les CDN
+      if (/^https?:\/\//i.test(href) || /^\/\//.test(href)) continue; // CDN
       try {
-        const css = await (await fetch(href)).text();
+        const res = await fetch(href);
+        if (!res.ok) continue;
+        const css = await res.text();
         const style = doc.createElement("style");
         style.textContent = css;
         link.replaceWith(style);
       } catch (_) {}
     }
 
-    // Inliner les scripts locaux demandés.
-    for (const path of inlineScripts || []) {
-      const res = await fetch(path);
-      const code = await res.text();
-      const tag = Array.from(doc.querySelectorAll("script[src]")).find((s) =>
-        (s.getAttribute("src") || "").endsWith(path.split("/").pop())
-      );
-      const inline = doc.createElement("script");
-      inline.textContent = code;
-      if (tag) {
-        tag.replaceWith(inline);
-      } else {
+    // Inliner TOUS les scripts locaux restants automatiquement.
+    // On les déplace à la fin du <body> : comme ça le DOM est complet quand ils
+    // s'exécutent, et la sémantique `defer` est naturellement respectée.
+    const localScripts = Array.from(doc.querySelectorAll("script[src]")).filter((s) => {
+      const src = s.getAttribute("src") || "";
+      return !/^https?:\/\//i.test(src) && !/^\/\//.test(src);
+    });
+    for (const tag of localScripts) {
+      const src = tag.getAttribute("src");
+      try {
+        const res = await fetch(src);
+        if (!res.ok) { tag.remove(); continue; }
+        const code = await res.text();
+        const inline = doc.createElement("script");
+        // Wrapper qui gère les deux cas : DOM déjà chargé ou pas encore.
+        // Même si l'inline script est placé en fin de body (DOM ready), cela rend
+        // le code résilient si un outil a du code qui s'attend à DOMContentLoaded.
+        inline.textContent =
+          "(function(){function __run(){\n" +
+          code +
+          "\n}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',__run);}else{__run();}})();";
+        tag.remove();
         doc.body.appendChild(inline);
-      }
+      } catch (_) { tag.remove(); }
     }
 
     // Injecter une bannière de titre à la place du header retiré.
@@ -171,13 +184,18 @@ window.ToolExport = (function () {
     banner.className = "bg-slate-900 text-white shadow";
     banner.innerHTML =
       '<div class="max-w-6xl mx-auto px-6 py-5"><h1 class="text-2xl font-bold">' +
-      (title || doc.title) +
+      escapeHtml(title || doc.title) +
       " <span class='text-xs font-normal text-slate-400'>(autonome)</span></h1></div>";
     doc.body.insertBefore(banner, doc.body.firstChild);
 
-    const out =
-      "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+    const out = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
     downloadFile(filename || "tool.html", out, "text/html;charset=utf-8");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
   }
 
   return {
