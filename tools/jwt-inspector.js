@@ -481,6 +481,13 @@
       });
     });
 
+    // Décodage automatique si ?token=... est présent dans l'URL
+    const urlToken = new URLSearchParams(window.location.search).get("token");
+    if (urlToken) {
+      $("token-input").value = urlToken;
+      decode();
+    }
+
     ToolExport.attachActions($("decoded-section"), () => {
       if (!parsed) return null;
       return "Header:\n" + JSON.stringify(parsed.header, null, 2) +
