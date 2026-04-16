@@ -6,6 +6,24 @@
     return "'" + String(s).replace(/'/g, "'\\''") + "'";
   }
 
+  function addCopyButton(preId) {
+    const pre = $(preId);
+    const wrapper = pre.parentElement;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Copier";
+    btn.className = "ch-copy-btn px-3 py-1 text-xs rounded font-medium bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50";
+    btn.addEventListener("click", async () => {
+      const text = pre.textContent;
+      if (!text) return;
+      await ToolExport.copyText(text);
+      btn.textContent = "Copié !";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = "Copier"; btn.disabled = false; }, 1500);
+    });
+    wrapper.insertBefore(btn, pre);
+  }
+
   function setStatus(msg, kind) {
     const el = $("status");
     el.textContent = msg;
@@ -20,7 +38,7 @@
     return raw.replace(/\\\r?\n\s*/g, " ").trim();
   }
 
-  function generateScript() {
+  function getFormValues() {
     const tokenUrl = $("token-url").value.trim();
     const clientId = $("client-id").value.trim();
     const clientSecret = $("client-secret").value;
@@ -29,20 +47,52 @@
     const curlRaw = $("curl-input").value;
     const useBasic = $("opt-basic").checked;
     const useEnv = $("opt-env").checked;
+    return { tokenUrl, clientId, clientSecret, scope, audience, curlRaw, useBasic, useEnv };
+  }
 
-    if (!tokenUrl || !clientId || !clientSecret) {
+  function validate(v) {
+    if (!v.tokenUrl || !v.clientId || !v.clientSecret) {
       setStatus("✗ Token URL, client_id et client_secret obligatoires.", "err");
-      return;
+      return false;
     }
-    if (!curlRaw.trim()) {
+    if (!v.curlRaw.trim()) {
       setStatus("✗ Commande curl cible manquante.", "err");
-      return;
+      return false;
     }
-    if (!/\{\{token\}\}/.test(curlRaw)) {
+    if (!/\{\{token\}\}/.test(v.curlRaw)) {
       setStatus("⚠ Le placeholder {{token}} est absent de la commande curl.", "err");
-      return;
+      return false;
+    }
+    return true;
+  }
+
+  function buildOneliner(v) {
+    const tokenParts = [
+      "curl -s --fail -X POST",
+      shQuote(v.tokenUrl),
+      "-H 'Content-Type: application/x-www-form-urlencoded'",
+      "-H 'Accept: application/json'",
+    ];
+    if (v.useBasic) {
+      tokenParts.push("--user " + shQuote(v.clientId + ":" + v.clientSecret));
     }
 
+    const dataParts = ["grant_type=client_credentials"];
+    if (!v.useBasic) {
+      dataParts.push("client_id=" + v.clientId);
+      dataParts.push("client_secret=" + v.clientSecret);
+    }
+    if (v.scope)    dataParts.push("scope=" + v.scope);
+    if (v.audience) dataParts.push("audience=" + v.audience);
+
+    dataParts.forEach((p) => tokenParts.push("--data-urlencode " + shQuote(p)));
+
+    const targetCurl = indentCurl(v.curlRaw).replace(/\{\{token\}\}/g, "$ACCESS_TOKEN");
+
+    return "ACCESS_TOKEN=$(" + tokenParts.join(" ") + " | jq -r '.access_token') && " + targetCurl;
+  }
+
+  function buildScript(v) {
     const lines = [];
     lines.push("#!/usr/bin/env bash");
     lines.push("set -euo pipefail");
@@ -52,16 +102,16 @@
     lines.push("");
 
     // Vars
-    lines.push("TOKEN_URL=" + shQuote(tokenUrl));
-    if (useEnv) {
-      lines.push('CLIENT_ID="${CLIENT_ID:-' + clientId.replace(/"/g, '\\"') + '}"');
-      lines.push('CLIENT_SECRET="${CLIENT_SECRET:-' + clientSecret.replace(/"/g, '\\"') + '}"');
+    lines.push("TOKEN_URL=" + shQuote(v.tokenUrl));
+    if (v.useEnv) {
+      lines.push('CLIENT_ID="${CLIENT_ID:-' + v.clientId.replace(/"/g, '\\"') + '}"');
+      lines.push('CLIENT_SECRET="${CLIENT_SECRET:-' + v.clientSecret.replace(/"/g, '\\"') + '}"');
     } else {
-      lines.push("CLIENT_ID=" + shQuote(clientId));
-      lines.push("CLIENT_SECRET=" + shQuote(clientSecret));
+      lines.push("CLIENT_ID=" + shQuote(v.clientId));
+      lines.push("CLIENT_SECRET=" + shQuote(v.clientSecret));
     }
-    if (scope)    lines.push("SCOPE="    + shQuote(scope));
-    if (audience) lines.push("AUDIENCE=" + shQuote(audience));
+    if (v.scope)    lines.push("SCOPE="    + shQuote(v.scope));
+    if (v.audience) lines.push("AUDIENCE=" + shQuote(v.audience));
     lines.push("");
 
     // Récupération token
@@ -73,19 +123,19 @@
       "--header", "'Content-Type: application/x-www-form-urlencoded'",
       "--header", "'Accept: application/json'",
     ];
-    if (useBasic) {
+    if (v.useBasic) {
       curlTokenArgs.push("--user", '"$CLIENT_ID:$CLIENT_SECRET"');
     }
     lines.push(curlTokenArgs.join(" ") + " \\");
 
     // Data fields
     const dataParts = ["grant_type=client_credentials"];
-    if (!useBasic) {
+    if (!v.useBasic) {
       dataParts.push('client_id=$CLIENT_ID');
       dataParts.push('client_secret=$CLIENT_SECRET');
     }
-    if (scope)    dataParts.push('scope=$SCOPE');
-    if (audience) dataParts.push('audience=$AUDIENCE');
+    if (v.scope)    dataParts.push('scope=$SCOPE');
+    if (v.audience) dataParts.push('audience=$AUDIENCE');
 
     const dataLine = dataParts
       .map((p) => '  --data-urlencode "' + p + '"')
@@ -102,19 +152,27 @@
     lines.push('echo ">>> Token obtenu (${#ACCESS_TOKEN} caractères)" >&2');
     lines.push("");
 
-    // Requête cible — on substitue {{token}} par $ACCESS_TOKEN
-    const targetCurl = indentCurl(curlRaw).replace(/\{\{token\}\}/g, "$ACCESS_TOKEN");
+    // Requête cible
+    const targetCurl = indentCurl(v.curlRaw).replace(/\{\{token\}\}/g, "$ACCESS_TOKEN");
     lines.push("echo '>>> Appel de la requête cible...' >&2");
     lines.push(targetCurl);
     lines.push("");
 
+    return lines.join("\n");
+  }
+
+  function generateBoth() {
+    const v = getFormValues();
+    if (!validate(v)) return;
+
     $("output-section").classList.remove("hidden");
-    $("script-out").textContent = lines.join("\n");
-    setStatus("✓ Script généré", "ok");
+    $("script-out").textContent = buildScript(v);
+    $("oneliner-out").textContent = buildOneliner(v);
+    setStatus("✓ Script + one-liner générés", "ok");
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    $("go-btn").addEventListener("click", generateScript);
+    $("go-btn").addEventListener("click", generateBoth);
 
     $("example-btn").addEventListener("click", () => {
       $("token-url").value = "https://login.example.com/oauth2/token";
@@ -135,6 +193,7 @@
       });
     });
 
-    ToolExport.attachActions($("output-section"), () => $("script-out").textContent || null);
+    addCopyButton("oneliner-out");
+    addCopyButton("script-out");
   });
 })();
