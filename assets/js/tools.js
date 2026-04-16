@@ -1,7 +1,7 @@
 // Registre central des outils.
 // Pour ajouter un outil : ajouter une entrée ici en précisant sa catégorie.
 // Catégories disponibles : "OIDC & OAuth2", "Auth & PKI", "Données", "Réseau", "XML".
-window.TOOL_CATEGORIES = ["OIDC & OAuth2", "Auth & PKI", "Données", "XML"];
+window.TOOL_CATEGORIES = ["OIDC & OAuth2", "Auth & PKI", "Données", "XML", "Shell"];
 
 window.TOOLS = [
   {
@@ -115,6 +115,14 @@ window.TOOLS = [
     description:
       "Analyzer HAR dédié aux flux OIDC (App / Keycloak / IdP) : séquence, phases, requêtes, tokens JWT avec vérification de signature via JWKS.",
     href: "./tools/har-viewer.html",
+  },
+  {
+    id: "cmd-formatter",
+    name: "Command Formatter",
+    category: "Shell",
+    description:
+      "Reformate une commande shell longue (curl, docker, etc.) en multi-lignes avec backslash continuation, en respectant une largeur max par ligne. Coupe intelligemment entre les arguments sans casser les quotes.",
+    href: "./tools/cmd-formatter.html",
   },
   {
     id: "xml-workbench",

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command Formatter — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    pre.cf-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.78rem; white-space: pre-wrap; word-break: break-word;
+      max-height: 400px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .cf-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    .cf-hint { font-size: 0.7rem; color: #64748b; }
+    .cf-stat { display: inline-block; background: #f1f5f9; border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.72rem; color: #475569; font-weight: 500; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./cmd-formatter.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">Shell</span>
+        <h2 class="page-title mt-3">Command Formatter</h2>
+        <p class="page-subtitle mt-3">
+          Reformate une commande shell longue en plusieurs lignes avec <code>\</code>
+          (backslash continuation), en respectant une largeur maximale par ligne.
+          Coupe intelligemment entre les arguments, sans casser les chaînes quotées.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Entrée</span>
+        <h3 class="font-bold text-lg">Commande</h3>
+      </div>
+
+      <label class="cf-label">Commande shell (one-liner)</label>
+      <textarea id="cmd-input" rows="5" class="field field-mono"
+        placeholder='curl -X POST "https://api.example.com/v1/users" -H "Authorization: Bearer eyJ..." -H "Content-Type: application/json" -d &apos;{"name":"John","email":"john@example.com"}&apos;'></textarea>
+
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <label class="cf-label" style="margin-bottom:0">Largeur max par ligne</label>
+        <input id="max-width" type="number" min="40" max="500" value="200" class="field field-mono" style="width: 5rem;" />
+        <label class="cf-label" style="margin-bottom:0">Indentation</label>
+        <select id="indent-style" class="field" style="width: auto;">
+          <option value="2">2 espaces</option>
+          <option value="4">4 espaces</option>
+          <option value="tab">Tab</option>
+        </select>
+        <button id="format-btn" type="button" class="btn btn-primary">Formater</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+        <div id="status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="output-section" class="hidden card animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
+        <h3 class="font-bold text-lg">Commande formatée</h3>
+      </div>
+
+      <div id="stats" class="flex flex-wrap gap-2 mb-3"></div>
+
+      <pre id="formatted-out" class="cf-out"></pre>
+      <p class="cf-hint mt-2">
+        Chaque ligne se termine par <code>\</code> sauf la dernière.
+        Copiable directement dans un terminal Linux / macOS.
+      </p>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · Command Formatter</footer>
+</body>
+</html>
