@@ -149,13 +149,13 @@
 
     $("example-btn").addEventListener("click", () => {
       $("cmd-input").value =
-        "curl -X POST \"https://api.example.com/v1/users\"" +
-        " -H \"Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature\"" +
-        " -H \"Content-Type: application/json\"" +
-        " -H \"Accept: application/json\"" +
-        " -H \"X-Request-ID: 550e8400-e29b-41d4-a716-446655440000\"" +
+        'curl -X POST "https://api.example.com/v1/users"' +
+        ' -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"' +
+        ' -H "Content-Type: application/json"' +
+        ' -H "Accept: application/json"' +
+        ' -H "X-Request-ID: 550e8400-e29b-41d4-a716-446655440000"' +
         " --connect-timeout 30 --max-time 60 --retry 3 --retry-delay 5" +
-        " -d '{\"name\":\"John Doe\",\"email\":\"john@example.com\",\"role\":\"admin\",\"org_id\":\"org-42\"}'";
+        " -d '{\"name\":\"John Doe\",\"email\":\"john@example.com\",\"role\":\"admin\"}'";
       $("shell-mode").checked = true;
       doFormat();
     });
