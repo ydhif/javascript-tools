@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Command Formatter — JavaScript Tools</title>
+  <title>Text Splitter — JavaScript Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -13,7 +13,7 @@
   <style>
     pre.cf-out {
       background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
-      font-size: 0.78rem; white-space: pre-wrap; word-break: break-word;
+      font-size: 0.78rem; white-space: pre-wrap; word-break: break-all;
       max-height: 400px; overflow: auto;
       font-family: "JetBrains Mono", ui-monospace, monospace;
     }
@@ -39,12 +39,11 @@
   <main class="max-w-6xl mx-auto px-6 py-8">
     <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
       <div>
-        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">Shell</span>
-        <h2 class="page-title mt-3">Command Formatter</h2>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">Texte</span>
+        <h2 class="page-title mt-3">Text Splitter</h2>
         <p class="page-subtitle mt-3">
-          Reformate un texte long ou une commande shell en plusieurs lignes
-          en respectant une largeur maximale. Coupe aux espaces et
-          préserve les chaînes quotées. En mode shell, ajoute <code>\</code> en fin de ligne.
+          Découpe un texte en lignes d'une longueur maximale donnée.
+          Utile pour splitter un token, une clé, du base64, ou n'importe quelle chaîne longue.
         </p>
       </div>
       <button id="download-html" type="button" class="btn btn-accent">
@@ -55,26 +54,17 @@
     <section class="card mb-6 animate-in">
       <div class="flex items-center gap-2 mb-3">
         <span class="badge" style="background: #eef2ff; color: #4338ca;">Entrée</span>
-        <h3 class="font-bold text-lg">Texte à formater</h3>
+        <h3 class="font-bold text-lg">Texte à découper</h3>
       </div>
 
-      <label class="cf-label">Texte ou commande (one-liner)</label>
+      <label class="cf-label">Texte</label>
       <textarea id="cmd-input" rows="5" class="field field-mono"
-        placeholder="Colle ici une longue commande curl, docker run, ou n'importe quel texte..."></textarea>
+        placeholder="Colle ici un token, une clé, du base64, ou n'importe quel texte long..."></textarea>
 
       <div class="mt-3 flex flex-wrap items-center gap-3">
-        <label class="cf-label" style="margin-bottom:0">Largeur max</label>
-        <input id="max-width" type="number" min="20" max="500" value="200" class="field field-mono" style="width: 5rem;" />
-        <label class="cf-label" style="margin-bottom:0">Indentation</label>
-        <select id="indent-style" class="field" style="width: auto;">
-          <option value="2">2 espaces</option>
-          <option value="4">4 espaces</option>
-          <option value="tab">Tab</option>
-        </select>
-        <label class="text-sm flex items-center gap-1.5">
-          <input type="checkbox" id="shell-mode" checked /> Mode shell (<code>\</code>)
-        </label>
-        <button id="format-btn" type="button" class="btn btn-primary">Formater</button>
+        <label class="cf-label" style="margin-bottom:0">Longueur max par ligne</label>
+        <input id="max-width" type="number" min="1" max="10000" value="200" class="field field-mono" style="width: 6rem;" />
+        <button id="format-btn" type="button" class="btn btn-primary">Splitter</button>
         <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
         <div id="status" class="text-sm"></div>
       </div>
@@ -83,19 +73,15 @@
     <section id="output-section" class="hidden card animate-in">
       <div class="flex items-center gap-2 mb-3">
         <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
-        <h3 class="font-bold text-lg">Texte formaté</h3>
+        <h3 class="font-bold text-lg">Texte découpé</h3>
       </div>
 
       <div id="stats" class="flex flex-wrap gap-2 mb-3"></div>
 
       <pre id="formatted-out" class="cf-out"></pre>
-      <p class="cf-hint mt-2">
-        En mode shell, chaque ligne sauf la dernière se termine par <code>\</code> (copiable directement dans un terminal).
-        En mode texte, simple retour à la ligne.
-      </p>
     </section>
   </main>
 
-  <footer class="app-footer">JavaScript Tools · Command Formatter</footer>
+  <footer class="app-footer">JavaScript Tools · Text Splitter</footer>
 </body>
 </html>

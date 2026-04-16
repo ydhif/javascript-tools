@@ -1,7 +1,7 @@
 // Registre central des outils.
 // Pour ajouter un outil : ajouter une entrée ici en précisant sa catégorie.
 // Catégories disponibles : "OIDC & OAuth2", "Auth & PKI", "Données", "Réseau", "XML".
-window.TOOL_CATEGORIES = ["OIDC & OAuth2", "Auth & PKI", "Données", "XML", "Shell"];
+window.TOOL_CATEGORIES = ["OIDC & OAuth2", "Auth & PKI", "Données", "XML"];
 
 window.TOOLS = [
   {
@@ -118,10 +118,10 @@ window.TOOLS = [
   },
   {
     id: "cmd-formatter",
-    name: "Command Formatter",
-    category: "Shell",
+    name: "Text Splitter",
+    category: "Données",
     description:
-      "Reformate un texte long ou une commande shell en multi-lignes en respectant une largeur max. Mode shell (backslash continuation) ou texte libre. Coupe aux espaces sans casser les quotes.",
+      "Découpe un texte en lignes d'une longueur max donnée. Utile pour splitter un token, une clé, du base64, ou n'importe quelle chaîne longue.",
     href: "./tools/cmd-formatter.html",
   },
   {
