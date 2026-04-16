@@ -10,82 +10,67 @@
                         "text-slate-600");
   }
 
-  // Découpe un texte en mots en préservant les chaînes quotées (simple et double).
-  function splitWords(text) {
-    const words = [];
-    let i = 0;
-    const len = text.length;
-
-    while (i < len) {
-      // Sauter les espaces
-      if (/\s/.test(text[i])) { i++; continue; }
-
-      let word = "";
-      while (i < len && !/\s/.test(text[i])) {
-        const ch = text[i];
-        if (ch === "'" || ch === '"') {
-          const quote = ch;
-          word += ch; i++;
-          while (i < len && text[i] !== quote) {
-            if (text[i] === "\\" && quote === '"') {
-              word += text[i] + (text[i + 1] || "");
-              i += 2;
-            } else {
-              word += text[i]; i++;
-            }
-          }
-          if (i < len) { word += text[i]; i++; }
-        } else if (ch === "\\") {
-          word += ch + (text[i + 1] || "");
-          i += 2;
-        } else {
-          word += ch; i++;
-        }
-      }
-      if (word) words.push(word);
-    }
-    return words;
-  }
-
   // Normalise les backslash-continuations existantes en une seule ligne.
   function normalize(raw) {
     return raw.replace(/\\\r?\n\s*/g, " ").replace(/[ \t]+/g, " ").trim();
   }
 
+  // Wrap caractère par caractère.
+  // Coupe de préférence au dernier espace trouvé dans la fenêtre.
+  // Si aucun espace : hard-cut à maxWidth.
   function wrapText(raw, maxWidth, indent, shellMode) {
-    const oneliner = normalize(raw);
-    if (!oneliner) return null;
-
-    if (oneliner.length <= maxWidth) {
-      return { formatted: oneliner, lines: 1, maxLine: oneliner.length, original: oneliner.length };
+    const text = normalize(raw);
+    if (!text) return null;
+    if (text.length <= maxWidth) {
+      return { formatted: text, lines: 1, maxLine: text.length, original: text.length };
     }
 
-    const words = splitWords(oneliner);
-    if (!words.length) return null;
-
-    const continuation = shellMode ? " \\" : "";
-    const contLen = continuation.length;
+    const contSuffix = shellMode ? " \\" : "";
+    const contLen = contSuffix.length;
     const lines = [];
-    let current = words[0];
+    let pos = 0;
 
-    for (let w = 1; w < words.length; w++) {
-      const candidate = current + " " + words[w];
-      if (candidate.length + contLen <= maxWidth) {
-        current = candidate;
+    while (pos < text.length) {
+      const isFirst = lines.length === 0;
+      const prefix = isFirst ? "" : indent;
+      const remaining = text.length - pos;
+      const isLast = remaining <= maxWidth - prefix.length;
+
+      // Largeur utile : sur les lignes non-dernières on réserve la place du " \"
+      const usable = isLast
+        ? maxWidth - prefix.length
+        : maxWidth - prefix.length - contLen;
+
+      if (remaining <= usable) {
+        // Tout le reste tient
+        lines.push(prefix + text.slice(pos));
+        break;
+      }
+
+      // Chercher le dernier espace dans la fenêtre [pos, pos+usable]
+      let cut = -1;
+      for (let i = pos + usable; i > pos; i--) {
+        if (text[i] === " ") { cut = i; break; }
+      }
+
+      if (cut > pos) {
+        // Couper à l'espace (on ne garde pas l'espace en fin de ligne)
+        lines.push(prefix + text.slice(pos, cut));
+        pos = cut + 1; // sauter l'espace
       } else {
-        lines.push(current);
-        current = indent + words[w];
+        // Aucun espace trouvé → hard-cut
+        lines.push(prefix + text.slice(pos, pos + usable));
+        pos += usable;
       }
     }
-    lines.push(current);
 
     const joiner = shellMode ? " \\\n" : "\n";
     const formatted = lines.join(joiner);
-    const maxLine = Math.max(...lines.map((l, idx) =>
-      idx < lines.length - 1 ? l.length + contLen : l.length
+    const maxLine = Math.max(...lines.map((l, i) =>
+      i < lines.length - 1 ? l.length + contLen : l.length
     ));
 
-    return { formatted, lines: lines.length, maxLine, original: oneliner.length };
+    return { formatted, lines: lines.length, maxLine, original: text.length };
   }
 
   function addCopyButton(preId) {
@@ -150,12 +135,12 @@
     $("example-btn").addEventListener("click", () => {
       $("cmd-input").value =
         'curl -X POST "https://api.example.com/v1/users"' +
-        ' -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"' +
+        ' -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.POstGetfAytaZS82wHcjoTyoqhMyxXiWdR7Nn7A29DNSl0EiXLdwJ6xC6AfgZWF1bOsS"' +
         ' -H "Content-Type: application/json"' +
         ' -H "Accept: application/json"' +
         ' -H "X-Request-ID: 550e8400-e29b-41d4-a716-446655440000"' +
         " --connect-timeout 30 --max-time 60 --retry 3 --retry-delay 5" +
-        " -d '{\"name\":\"John Doe\",\"email\":\"john@example.com\",\"role\":\"admin\"}'";
+        ' -d \'{"name":"John Doe","email":"john@example.com","role":"admin"}\'';
       $("shell-mode").checked = true;
       doFormat();
     });
