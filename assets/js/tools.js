@@ -121,7 +121,7 @@ window.TOOLS = [
     name: "Command Formatter",
     category: "Shell",
     description:
-      "Reformate une commande shell longue (curl, docker, etc.) en multi-lignes avec backslash continuation, en respectant une largeur max par ligne. Coupe intelligemment entre les arguments sans casser les quotes.",
+      "Reformate un texte long ou une commande shell en multi-lignes en respectant une largeur max. Mode shell (backslash continuation) ou texte libre. Coupe aux espaces sans casser les quotes.",
     href: "./tools/cmd-formatter.html",
   },
   {
