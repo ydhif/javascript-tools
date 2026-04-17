@@ -30,7 +30,7 @@
                border-radius: 0.6rem; padding: 0.75rem; }
 
     /* Tabs */
-    .xw-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(148, 163, 184, 0.3); }
+    .xw-tabs { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(148, 163, 184, 0.3); flex-wrap: wrap; }
     .xw-tab {
       padding: 0.45rem 0.9rem; font-size: 0.8rem; font-weight: 600;
       color: #64748b; cursor: pointer; border-radius: 0.4rem 0.4rem 0 0;
@@ -47,8 +47,9 @@
       content: ""; position: absolute; left: 0.3rem; top: 0; bottom: 0;
       border-left: 1px dashed rgba(148, 163, 184, 0.35);
     }
-    .xw-row { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 1px 0; border-radius: 3px; }
+    .xw-row { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 1px 4px; border-radius: 3px; cursor: pointer; }
     .xw-row:hover { background: rgba(99, 102, 241, 0.06); }
+    .xw-row.xw-selected { background: rgba(99, 102, 241, 0.12); outline: 1px solid rgba(99, 102, 241, 0.3); }
     .xw-toggle { display:inline-block; width: 1rem; color:#64748b; cursor:pointer;
                  font-size: 0.7rem; text-align: center; user-select: none; }
     .xw-toggle.leaf { color: transparent; cursor: default; }
@@ -61,6 +62,35 @@
     .xw-preview { color: #94a3b8; font-style: italic; margin-left: 0.35rem; }
 
     .xw-hit { background: #fef08a !important; outline: 2px solid #facc15; border-radius: 2px; }
+    .xw-search-hit > .xw-row { background: #fef08a; }
+
+    /* Context bar */
+    .xw-context {
+      background: #eef2ff; border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 0.5rem; padding: 0.4rem 0.7rem;
+      font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.72rem;
+    }
+
+    /* Validation errors */
+    .xw-err-item {
+      padding: 0.35rem 0.5rem; border-left: 3px solid #ef4444;
+      background: #fef2f2; margin-bottom: 0.3rem; border-radius: 0 4px 4px 0;
+      font-size: 0.75rem; cursor: pointer;
+    }
+    .xw-err-item:hover { background: #fee2e2; }
+    .xw-warn-item {
+      padding: 0.35rem 0.5rem; border-left: 3px solid #f59e0b;
+      background: #fffbeb; margin-bottom: 0.3rem; border-radius: 0 4px 4px 0;
+      font-size: 0.75rem;
+    }
+
+    /* Info tab */
+    .xw-info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; font-size: 0.78rem; }
+    .xw-info-label { color: #64748b; font-weight: 600; }
+    .xw-info-val { color: #334155; font-family: "JetBrains Mono", monospace; }
+    .xw-ns-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.5rem; }
+    .xw-ns-table th { text-align: left; font-weight: 600; color: #64748b; padding: 0.3rem 0.5rem; border-bottom: 1px solid #e2e8f0; }
+    .xw-ns-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #f1f5f9; font-family: "JetBrains Mono", monospace; }
 
     /* Schema view */
     .xs-box {
@@ -98,11 +128,96 @@
       font-size: 0.75rem; white-space: pre-wrap; word-break: break-word;
       max-height: 100%; overflow: auto;
     }
+
+    /* Model browser */
+    .xm-breadcrumb {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem;
+      font-size: 0.72rem; margin-bottom: 0.5rem; min-height: 1.5rem;
+    }
+    .xm-crumb {
+      color: #4338ca; cursor: pointer; font-weight: 600;
+      padding: 0.1rem 0.3rem; border-radius: 3px;
+    }
+    .xm-crumb:hover { background: #eef2ff; text-decoration: underline; }
+    .xm-crumb-sep { color: #94a3b8; }
+    .xm-crumb.current { color: #334155; cursor: default; }
+    .xm-crumb.current:hover { background: transparent; text-decoration: none; }
+
+    .xm-card {
+      border: 1.5px solid rgba(148, 163, 184, 0.5);
+      border-radius: 0.6rem; padding: 0.7rem 0.9rem;
+      margin-bottom: 0.5rem; background: #fff;
+      box-shadow: 0 1px 4px rgba(15,23,42,0.06);
+      transition: border-color 0.15s;
+    }
+    .xm-card:hover { border-color: rgba(99, 102, 241, 0.4); }
+    .xm-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.25rem; }
+    .xm-card-kind {
+      display: inline-block; padding: 0.05rem 0.45rem; border-radius: 3px;
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .xm-kind-elem { background: #fce7f3; color: #be185d; }
+    .xm-kind-ct { background: #e0e7ff; color: #3730a3; }
+    .xm-kind-st { background: #dcfce7; color: #166534; }
+    .xm-kind-ag { background: #fef3c7; color: #92400e; }
+    .xm-kind-grp { background: #f1f5f9; color: #475569; }
+
+    .xm-link { color: #4338ca; cursor: pointer; font-weight: 600; font-size: 0.78rem; }
+    .xm-link:hover { text-decoration: underline; }
+    .xm-section-title { font-weight: 700; color: #475569; font-size: 0.72rem; margin: 0.6rem 0 0.3rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .xm-child-row {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.4rem;
+      border-radius: 4px; font-size: 0.78rem;
+    }
+    .xm-child-row:hover { background: rgba(99, 102, 241, 0.06); }
+    .xm-connector { width: 1.2rem; border-bottom: 1px solid #cbd5e1; height: 0; margin-right: 0.2rem; }
+    .xm-used-by {
+      font-size: 0.72rem; color: #64748b; padding: 0.2rem 0.4rem;
+      border-radius: 3px; cursor: pointer;
+    }
+    .xm-used-by:hover { background: #f1f5f9; color: #4338ca; }
+
+    .xm-sidebar {
+      display: grid; grid-template-columns: 180px 1fr; gap: 0.75rem;
+      height: 100%; min-height: 0;
+    }
+    .xm-toc {
+      overflow-y: auto; border-right: 1px solid rgba(148, 163, 184, 0.25);
+      padding-right: 0.5rem; font-size: 0.72rem;
+    }
+    .xm-toc-section { font-weight: 700; color: #475569; font-size: 0.65rem; text-transform: uppercase; margin: 0.5rem 0 0.2rem; letter-spacing: 0.04em; }
+    .xm-toc-item {
+      padding: 0.15rem 0.3rem; border-radius: 3px; cursor: pointer;
+      color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .xm-toc-item:hover { background: #eef2ff; color: #4338ca; }
+    .xm-toc-item.active { background: #e0e7ff; color: #4338ca; font-weight: 600; }
+    .xm-detail { overflow-y: auto; padding: 0 0.25rem; }
+
+    @media (max-width: 900px) {
+      .xm-sidebar { grid-template-columns: 1fr; }
+      .xm-toc { border-right: 0; border-bottom: 1px solid rgba(148, 163, 184, 0.25); padding-bottom: 0.5rem; max-height: 150px; }
+    }
+
+    /* CodeMirror wrapper */
+    .cm-editor { height: 100%; font-size: 0.82rem; border-radius: 0.6rem; overflow: hidden; }
+    .cm-editor .cm-scroller { overflow: auto; }
+    .xw-cm-wrap { flex: 1; min-height: 0; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 0.6rem; overflow: hidden; }
   </style>
   <script src="../assets/js/tools.js" defer></script>
   <script src="../assets/js/menu.js" defer></script>
   <script src="../assets/js/export.js" defer></script>
   <script src="./xml-workbench.js" defer></script>
+  <script type="module">
+    try {
+      const [{EditorView, basicSetup}, {xml}] = await Promise.all([
+        import("https://esm.sh/codemirror@6.0.1"),
+        import("https://esm.sh/@codemirror/lang-xml@6.1.0")
+      ]);
+      window.CM = {EditorView, basicSetup, xml};
+      window.dispatchEvent(new Event("cm-ready"));
+    } catch(e) { console.warn("CodeMirror failed to load, fallback to textarea:", e); }
+  </script>
 </head>
 <body>
   <header class="app-header">
@@ -120,8 +235,8 @@
         <span class="badge" style="background: rgba(234, 88, 12, 0.14); color: #c2410c;">XML Tooling</span>
         <h2 class="page-title mt-3">XML Workbench</h2>
         <p class="page-subtitle mt-3">
-          Équivalent léger de XMLSpy : parse / pretty-print, arbre interactif,
-          test XPath en live, transformation XSLT 1.0. 100% navigateur.
+          Équivalent léger de XMLSpy : parse / pretty-print, arbre interactif avec recherche,
+          XPath, XSLT, validation XSD, statistiques et namespaces. 100% navigateur.
         </p>
       </div>
       <button id="download-html" type="button" class="btn btn-accent">
@@ -142,6 +257,7 @@
           <button id="pretty-btn" type="button" class="btn btn-ghost">Pretty</button>
           <button id="minify-btn" type="button" class="btn btn-ghost">Minify</button>
         </div>
+        <div id="cm-wrap" class="xw-cm-wrap" style="display:none;"></div>
         <textarea id="xml-input" class="field field-mono xw-input"
           placeholder='<?xml version="1.0"?><root><item id="1">Hello</item></root>'></textarea>
         <div id="parse-status" class="text-sm mt-2"></div>
@@ -154,12 +270,28 @@
           <div class="xw-tab" data-tab="xpath">XPath</div>
           <div class="xw-tab" data-tab="xslt">XSLT</div>
           <div class="xw-tab" data-tab="schema">Schema</div>
+          <div class="xw-tab" data-tab="model">Modèle</div>
+          <div class="xw-tab" data-tab="info">Info</div>
         </div>
 
+        <!-- Tree panel -->
         <div class="xw-panel active" data-panel="tree">
+          <div class="flex gap-2 mb-2">
+            <input id="tree-search" type="text" class="field field-mono" style="font-size:0.78rem;"
+              placeholder="Rechercher (nom, attribut, texte)..." />
+            <button id="tree-search-btn" type="button" class="btn btn-ghost" style="padding:0.3rem 0.6rem;">Chercher</button>
+            <span id="tree-search-stats" class="text-xs text-slate-500 self-center"></span>
+          </div>
+          <div id="tree-context" class="xw-context hidden mb-2 flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-slate-500">XPath :</span>
+            <span id="node-xpath" class="flex-1 text-indigo-800" style="word-break:break-all;"></span>
+            <button id="copy-xpath-btn" type="button" class="btn btn-ghost" style="padding:0.2rem 0.5rem; font-size:0.7rem;">Copier XPath</button>
+            <button id="copy-json-btn" type="button" class="btn btn-ghost" style="padding:0.2rem 0.5rem; font-size:0.7rem;">Export JSON</button>
+          </div>
           <div id="tree" class="xw-body xw-tree"></div>
         </div>
 
+        <!-- XPath panel -->
         <div class="xw-panel" data-panel="xpath">
           <div class="mb-2 flex gap-2">
             <input id="xpath-input" type="text" class="field field-mono"
@@ -170,6 +302,7 @@
           <div id="xpath-results" class="xw-body"></div>
         </div>
 
+        <!-- XSLT panel -->
         <div class="xw-panel" data-panel="xslt">
           <label class="text-sm font-semibold text-slate-600 mb-1 block">Feuille XSLT 1.0</label>
           <textarea id="xslt-input" class="field field-mono" rows="8"
@@ -181,13 +314,45 @@
           <pre id="xslt-output" class="xw-out" style="flex:1; min-height: 0;"></pre>
         </div>
 
+        <!-- Schema panel -->
         <div class="xw-panel" data-panel="schema">
+          <div class="mb-2">
+            <label class="text-sm font-semibold text-slate-600 mb-1 block">XSD (coller ici pour validation)</label>
+            <textarea id="xsd-input" class="field field-mono" rows="5"
+              placeholder="Colle un XSD ici pour valider le XML source, ou charge depuis la source..."></textarea>
+          </div>
           <div class="mb-2 flex items-center gap-2 flex-wrap">
-            <button id="schema-load" type="button" class="btn btn-primary">Charger le XSD depuis la source</button>
+            <button id="schema-load" type="button" class="btn btn-ghost">Charger le XSD depuis la source</button>
+            <button id="validate-btn" type="button" class="btn btn-primary">Valider XML contre XSD</button>
             <button id="schema-example" type="button" class="btn btn-ghost">Exemple XSD</button>
             <div id="schema-status" class="text-xs text-slate-500"></div>
           </div>
+          <div id="validation-results" class="mb-2"></div>
           <div id="schema-view" class="xw-body" style="font-size: 0.8rem;"></div>
+        </div>
+
+        <!-- Model browser panel -->
+        <div class="xw-panel" data-panel="model">
+          <div class="mb-2 flex items-center gap-2 flex-wrap">
+            <button id="model-load" type="button" class="btn btn-primary">Charger le XSD</button>
+            <button id="model-from-schema" type="button" class="btn btn-ghost">Depuis le champ Schema</button>
+            <span id="model-status" class="text-xs text-slate-500"></span>
+          </div>
+          <div id="model-browser" class="xm-sidebar" style="flex:1; min-height:0;">
+            <div id="model-toc" class="xm-toc">
+              <p class="text-slate-400 italic text-xs">Charger un XSD.</p>
+            </div>
+            <div id="model-detail" class="xm-detail">
+              <p class="text-slate-400 italic text-xs">Sélectionner un élément ou type dans la liste.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info panel -->
+        <div class="xw-panel" data-panel="info">
+          <div id="info-content" class="xw-body" style="font-size: 0.82rem;">
+            <p class="text-slate-400 italic">Analyser un XML pour voir les statistiques.</p>
+          </div>
         </div>
       </section>
     </div>

@@ -129,7 +129,7 @@ window.TOOLS = [
     name: "XML Workbench",
     category: "XML",
     description:
-      "Équivalent léger de XMLSpy : parse / pretty-print, arbre interactif, test XPath 1.0, transformation XSLT 1.0, vue Schema (XSD).",
+      "Équivalent de XMLSpy : parse / pretty-print, arbre interactif avec recherche, copie XPath, export JSON, XPath 1.0, XSLT 1.0, validation XSD, vue Schema, statistiques, namespaces, syntax highlighting (CodeMirror).",
     href: "./tools/xml-workbench.html",
   },
 ];
