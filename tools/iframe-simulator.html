@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; frame-src https: data:; child-src https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iframe Simulator — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .ifs-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 1100px) { .ifs-grid { grid-template-columns: 1fr; } }
+    .ifs-frame-wrap {
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 0.6rem;
+      overflow: hidden;
+      background:
+        repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;
+      min-height: 320px;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+    .ifs-frame-wrap iframe {
+      flex: 1;
+      width: 100%;
+      min-height: 320px;
+      background: #fff;
+      border: 0;
+    }
+    .ifs-flag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.55rem;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      background: #fff;
+      transition: all 0.15s;
+    }
+    .ifs-flag input { margin: 0; }
+    .ifs-flag:has(input:checked) {
+      background: #eef2ff;
+      border-color: #6366f1;
+      color: #3730a3;
+      font-weight: 600;
+    }
+    .ifs-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .ifs-status {
+      font-size: 0.78rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 600;
+    }
+    .ifs-status.ok    { background: #ecfdf5; color: #047857; }
+    .ifs-status.warn  { background: #fffbeb; color: #92400e; }
+    .ifs-status.err   { background: #fef2f2; color: #991b1b; }
+    .ifs-status.idle  { background: #f1f5f9; color: #475569; }
+    .ifs-code {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.78rem;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 0.7rem 0.9rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .ifs-msg {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.74rem;
+      border-left: 3px solid #6366f1;
+      padding: 0.4rem 0.6rem;
+      background: #f8fafc;
+      margin-bottom: 0.4rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 0 0.3rem 0.3rem 0;
+    }
+    .ifs-msg .ifs-msg-meta {
+      color: #64748b;
+      font-size: 0.7rem;
+      margin-bottom: 0.2rem;
+    }
+    .ifs-headers {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.74rem;
+    }
+    .ifs-headers th, .ifs-headers td {
+      padding: 0.3rem 0.6rem;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+    .ifs-headers th { color: #475569; font-weight: 600; width: 40%; }
+    .ifs-row-bad td { background: #fef2f2; }
+    .ifs-row-ok td { background: #ecfdf5; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./iframe-simulator.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(99, 102, 241, 0.14); color: #4338ca;">Embedding & sandbox</span>
+        <h2 class="page-title mt-3">Iframe Simulator</h2>
+        <p class="page-subtitle mt-3">
+          Teste si une URL peut être embarquée (X-Frame-Options, CSP <code>frame-ancestors</code>),
+          configure <code>sandbox</code> / <code>allow</code> / <code>referrerpolicy</code>,
+          prévisualise le rendu et envoie/reçoit des messages via <code>postMessage</code>.
+          100% local.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="ifs-grid">
+        <div>
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">URL à charger</label>
+          <input id="url" type="url" class="field field-mono mb-3" placeholder="https://example.com" />
+
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Sandbox <span class="text-xs font-normal text-slate-500">(vide = sandbox stricte)</span></label>
+          <div id="sandbox-flags" class="ifs-flags mb-3"></div>
+          <div class="flex gap-2 mb-4">
+            <button id="sandbox-none" type="button" class="btn btn-ghost text-xs">Pas de sandbox</button>
+            <button id="sandbox-strict" type="button" class="btn btn-ghost text-xs">Sandbox stricte (vide)</button>
+            <button id="sandbox-typical" type="button" class="btn btn-ghost text-xs">Typique (scripts + same-origin)</button>
+          </div>
+
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Allow (Permissions Policy)</label>
+          <div id="allow-flags" class="ifs-flags mb-4"></div>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="text-sm font-semibold text-slate-600 mb-1 block">Referrer-Policy</label>
+              <select id="referrerpolicy" class="field">
+                <option value="">(défaut)</option>
+                <option>no-referrer</option>
+                <option>no-referrer-when-downgrade</option>
+                <option>origin</option>
+                <option>origin-when-cross-origin</option>
+                <option>same-origin</option>
+                <option>strict-origin</option>
+                <option>strict-origin-when-cross-origin</option>
+                <option>unsafe-url</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-slate-600 mb-1 block">Loading</label>
+              <select id="loading" class="field">
+                <option value="">(défaut)</option>
+                <option>eager</option>
+                <option>lazy</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="text-sm font-semibold text-slate-600 mb-1 block">Largeur</label>
+              <input id="width" type="text" class="field" placeholder="100%" value="100%" />
+            </div>
+            <div>
+              <label class="text-sm font-semibold text-slate-600 mb-1 block">Hauteur (px)</label>
+              <input id="height" type="number" class="field" min="120" max="2000" value="480" />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button id="load-btn" type="button" class="btn btn-primary">Charger</button>
+            <button id="reload-btn" type="button" class="btn btn-ghost">Recharger</button>
+            <button id="open-tab" type="button" class="btn btn-ghost">Ouvrir dans un onglet</button>
+            <button id="example-btn" type="button" class="btn btn-ghost">Charger un exemple</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span id="status" class="ifs-status idle">Prêt</span>
+              <span id="timing" class="text-xs text-slate-500"></span>
+            </div>
+            <div class="text-xs text-slate-500">Origin courante : <code id="parent-origin"></code></div>
+          </div>
+          <div class="ifs-frame-wrap" id="frame-wrap">
+            <iframe id="preview" title="Iframe preview" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">
+            Le navigateur affiche les détails de blocage dans la <b>console DevTools</b>
+            (Refused to display ... in a frame because ...). La détection ci-dessus
+            est heuristique : elle distingue un chargement réussi cross-origin d'une page
+            laissée à <code>about:blank</code>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="result-section" class="card mb-6 animate-in">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background: #eef2ff; color: #3730a3;">Code généré</span>
+          <h3 class="font-bold text-lg">Balise &lt;iframe&gt;</h3>
+        </div>
+      </div>
+      <pre id="generated-html" class="ifs-code"></pre>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background: #fff7ed; color: #9a3412;">Anti-framing</span>
+          <h3 class="font-bold text-lg">Headers HTTP (probe)</h3>
+        </div>
+        <button id="probe-btn" type="button" class="btn btn-ghost text-xs">Sonder l'URL</button>
+      </div>
+      <p class="text-xs text-slate-500 mb-2">
+        Tente un <code>fetch()</code> de l'URL en mode CORS pour lire <code>X-Frame-Options</code>
+        et la directive <code>frame-ancestors</code> de la <code>Content-Security-Policy</code>.
+        Si la cible n'autorise pas CORS, les headers ne sont pas lisibles depuis le navigateur —
+        un mode <code>no-cors</code> de fallback indique au moins si la ressource est joignable.
+      </p>
+      <div id="probe-result"></div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background: #ecfdf5; color: #047857;">postMessage</span>
+          <h3 class="font-bold text-lg">Communication parent ↔ iframe</h3>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Message à envoyer (JSON ou texte)</label>
+          <textarea id="pm-payload" class="field field-mono" rows="4" placeholder='{"type":"ping","ts":1234567890}'></textarea>
+          <label class="text-sm font-semibold text-slate-600 mt-3 mb-1 block">targetOrigin</label>
+          <input id="pm-target" type="text" class="field field-mono" value="*" />
+          <div class="flex gap-2 mt-3">
+            <button id="pm-send" type="button" class="btn btn-primary text-sm">Envoyer</button>
+            <button id="pm-clear" type="button" class="btn btn-ghost text-sm">Vider la console</button>
+          </div>
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-600 mb-1 block">Messages reçus de l'iframe</label>
+          <div id="pm-log" class="border border-slate-200 rounded-md p-2 min-h-[160px] max-h-[260px] overflow-auto bg-white">
+            <div class="text-xs text-slate-400 italic">Aucun message reçu pour l'instant.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · Iframe Simulator</footer>
+</body>
+</html>

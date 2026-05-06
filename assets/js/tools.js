@@ -125,6 +125,14 @@ window.TOOLS = [
     href: "./tools/cmd-formatter.html",
   },
   {
+    id: "iframe-simulator",
+    name: "Iframe Simulator",
+    category: "Données",
+    description:
+      "Teste l'embedding d'une URL : X-Frame-Options, CSP frame-ancestors, sandbox, allow, referrerpolicy. Prévisualisation live, sonde des headers et console postMessage.",
+    href: "./tools/iframe-simulator.html",
+  },
+  {
     id: "xml-workbench",
     name: "XML Workbench",
     category: "XML",
