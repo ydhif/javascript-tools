@@ -117,6 +117,14 @@ window.TOOLS = [
     href: "./tools/har-viewer.html",
   },
   {
+    id: "keycloak-app",
+    name: "Keycloak App",
+    category: "OIDC & OAuth2",
+    description:
+      "Client OIDC complet (équivalent local de keycloak.org/app) : sign in via authorization code + PKCE, affichage des tokens, userinfo, refresh, sign out.",
+    href: "./tools/keycloak-app.html",
+  },
+  {
     id: "cmd-formatter",
     name: "Text Splitter",
     category: "Données",

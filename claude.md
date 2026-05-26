@@ -19,9 +19,10 @@ Le projet s'est spécialisé progressivement sur **OIDC / OAuth2** comme crénea
 2. **PKCE & Authz URL Builder** — déclenche un login (authz code + PKCE)
 3. **OIDC ID Token Validator** — valide l'id_token reçu (§3.1.3.7)
 4. **OIDC Logout URL Builder** — logout propre (RP-initiated)
-5. **JWT Inspector** (décode + vérif + **signer**) — transversal, utile pour client_assertion
-6. **HAR Analyzer** — rejoue / debug un flow OIDC depuis un HAR capturé
-7. **Curl Helper** — génère le script bash pour l'échange code ↔ token (client_credentials et plus)
+5. **Keycloak App** — client OIDC end-to-end (login + tokens + userinfo + refresh + logout) en live
+6. **JWT Inspector** (décode + vérif + **signer**) — transversal, utile pour client_assertion
+7. **HAR Analyzer** — rejoue / debug un flow OIDC depuis un HAR capturé
+8. **Curl Helper** — génère le script bash pour l'échange code ↔ token (client_credentials et plus)
 
 # Cerficate Analyzer
 
@@ -107,6 +108,21 @@ Générateur de **script bash** : à partir d'un endpoint token + client_id/secr
 
 Testeur de regex JavaScript 100% local. Saisie du pattern avec slashes visibles (`/.../flags`), toggles pour les flags `g/i/m/s/u/y` cliquables, input libre pour les flags. Exécution via `RegExp` natif + `matchAll`. Rendu : **surlignage** des matches dans le texte + **liste** des matches avec index / length / groupes numérotés (`$1`, `$2`) et groupes nommés (`$<name>`). **Mode substitution** live avec support `$1`, `$<name>`, `$&`. **Bibliothèque de 18 patterns courants** (email, URL, UUID v4, IPv4/v6, date ISO/FR, JWT, slug, mot de passe fort, téléphone FR, HTML tag, etc.). **Export** du pattern vers JavaScript, Python (avec flags), Java, Go, PHP. Cheatsheet complet (classes, quantifiers, ancres, groupes, lookaround). Garde-fou anti-boucle infinie sur `/()/g`.
 
+# Keycloak App
+
+Client OIDC end-to-end exécuté dans le navigateur — **équivalent local de `https://www.keycloak.org/app/`**. Configuration : base URL Keycloak + realm + client_id + redirect_uri (par défaut l'URL de la page elle-même) + scope + `kc_idp_hint` optionnel. Le client doit être configuré en **public** côté Keycloak, avec **Standard Flow Enabled** et l'URL de la page ajoutée aux **Valid Redirect URIs** et **Web Origins** (sinon l'échange code↔token est bloqué par CORS).
+
+Flow implémenté en pur WebCrypto (sans `keycloak-js`) :
+- **Sign in** : génère `code_verifier` (64 chars RFC 7636) + `code_challenge` S256 + `state` + `nonce` (`crypto.getRandomValues`), stocke le tout en `sessionStorage`, puis redirige vers `/realms/<realm>/protocol/openid-connect/auth?response_type=code&...`.
+- **Callback** : détecte `?code=...&state=...` au chargement, vérifie le `state` (CSRF), envoie `POST /token` avec `grant_type=authorization_code` + `code_verifier`, vérifie que `id_token.nonce` matche, nettoie l'URL via `history.replaceState`.
+- **Refresh** : `POST /token` avec `grant_type=refresh_token`, remplace les tokens en session.
+- **User info** : `GET /userinfo` avec `Authorization: Bearer <access_token>`.
+- **Sign out** : redirige vers `/logout?id_token_hint=...&client_id=...&post_logout_redirect_uri=...`.
+
+Affichage en onglets : **Profil** (claims du `id_token` mappés vers leur label humain — sub, preferred_username, name, email, realm_access, etc., avec timestamps lisibles), **Access token** (raw + header + payload + expiration relative), **ID token** (idem), **Refresh token** (raw + payload si JWT, sinon opaque), **Réponse brute** (le JSON complet de `/token`). Bandeau **statut** (Connecté / Déconnecté) en pastille colorée. **Journal** des étapes du flow (PKCE généré, redirection, code reçu, échange token, refresh, userinfo, logout) avec timestamps — utile pour expliquer le flow ou débugger une erreur CORS. **Endpoints calculés** affichés en table (issuer, /auth, /token, /userinfo, /logout, /certs). Reset session (efface le sessionStorage local sans appeler le logout côté serveur).
+
+Tout est stocké en `sessionStorage` (vidé à la fermeture de l'onglet), jamais en `localStorage`. Copie / export / wiki / téléchargement HTML autonome.
+
 # Iframe Simulator
 
 Simulateur d'iframe pour tester l'embedding d'une URL. Inputs : URL cible, drapeaux **sandbox** (allow-scripts, allow-same-origin, allow-forms, allow-popups, allow-modals, allow-top-navigation, allow-downloads, etc.), drapeaux **allow** (Permissions Policy : camera, microphone, geolocation, fullscreen, autoplay, clipboard-read/write, payment…), `referrerpolicy`, `loading`, dimensions. Prévisualise l'iframe en live, génère le code HTML correspondant, et fournit une heuristique de blocage (`load` + lecture de `contentWindow.location.href` : si lisible et `about:blank` → bloqué par X-Frame-Options ou CSP `frame-ancestors`, sinon SecurityError → cross-origin chargé OK). Bouton **Sonder** : `fetch()` mode CORS pour lire `X-Frame-Options` et la directive `frame-ancestors` de la `Content-Security-Policy`, fallback `no-cors` pour vérifier la joignabilité quand CORS bloque la lecture des headers. **Console postMessage** : envoyer un payload (JSON ou texte) avec `targetOrigin` configurable, et afficher les messages reçus de l'iframe (filtrés sur `event.source`). Presets sandbox (aucune / stricte / typique). Exemples : example.com (charge), google.com (bloqué SAMEORIGIN), youtube.com/embed (conçu pour iframe), Keycloak (login OIDC, doit refuser le framing). Copie / export / wiki / téléchargement HTML autonome.
@@ -142,6 +158,7 @@ Simulateur d'iframe pour tester l'embedding d'une URL. Inputs : URL cible, drape
 - [x] **OIDC Discovery Explorer** (`tools/oidc-discovery.{html,js}`) — fetch `/.well-known/openid-configuration` + JWKS, liste les endpoints (avec copie), rend les capabilities en chips colorés selon leur niveau de sécurité, audit gradé (PKCE S256, flows legacy, algos id_token, SSRF via request_uri, etc.), préréglages providers courants, mode manuel pour les issuers CORS-bloquants.
 - [x] **JWT Inspector** (`tools/jwt-inspector.{html,js}`) — décodage header/payload, vérification WebCrypto HS/RS/ES/PS 256-384-512, **signer un JWT** (WebCrypto avec import PKCS#8 / JWK / secret texte), générateur de clé intégré (secret aléatoire / paire RSA 2048 / paire EC P-256/384/521, clé publique auto-placée dans la section vérification), exemple **client_assertion** (RFC 7523) pré-rempli pour le flow OIDC `private_key_jwt`, bouton de chaînage signer → décoder.
 - [x] **HAR Analyzer** (`tools/har-viewer.{html,js}`) — analyzer OIDC dédié (App / Keycloak / IdP brokering) : drop zone avec progress, auto-détection des hôtes, classification en phases, onglets Séquence (canvas + PlantUML), Phases, Requêtes (filtrables + CSV), Tokens (extraction JWT + vérification signature via JWKS du `iss` / `.well-known/openid-configuration`). Styling aligné sur la charte (cards, btn, field, badge).
+- [x] **Keycloak App** (`tools/keycloak-app.{html,js}`) — équivalent local de `keycloak.org/app/` : authorization code + PKCE en pur WebCrypto (pas de `keycloak-js`), gestion complète du round-trip (sign in redirect, callback handler avec vérif `state` + `nonce`, POST /token, refresh_token, userinfo, sign out via end_session_endpoint). Onglets Profil / Access token / ID token / Refresh token / Réponse brute. Journal des étapes (timestamps) pour expliquer le flow ou débugger CORS. Endpoints calculés en table. Stockage `sessionStorage` uniquement. Le client Keycloak doit être public, Standard Flow Enabled, URL de la page dans Valid Redirect URIs **et** Web Origins.
 - [x] **Gzip Tool** (`tools/gzip-tool.{html,js}`) — compression/décompression gzip/deflate/deflate-raw via Compression Streams API, encodage Base64/Base64url/Hex, upload fichier / téléchargement `.gz`, stats original/compressé/ratio.
 - [x] **CSR Generator** (`tools/csr-generator.{html,js}`) — génération RSA (2048/3072/4096) + PKCS#10 via node-forge, subject complet, SAN multi-types (dns/ip/email/uri), algo SHA-256/384/512, sortie CSR/clé PEM avec copie + téléchargement `.csr`/`.key`, relecture tabulaire, décodeur de CSR existant avec vérification de signature.
 - [x] **Curl Helper** (`tools/curl-helper.{html,js}`) — **générateur de script bash** : à partir d'un token endpoint + client_id/secret + scope/audience + curl cible avec `{{token}}`, produit un script bash qui utilise `curl` + `jq` pour récupérer `access_token` (grant_type client_credentials) et exécute ensuite la requête cible avec le token injecté. Options Basic Auth et secrets via env vars. Téléchargement HTML autonome.

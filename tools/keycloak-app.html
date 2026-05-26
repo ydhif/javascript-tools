@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Keycloak App — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    .kc-label {
+      font-size: 0.78rem; font-weight: 600; color: #334155;
+      margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .kc-label-desc {
+      font-size: 0.68rem; color: #94a3b8; font-weight: 400;
+    }
+    pre.kc-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.72rem; white-space: pre-wrap; word-break: break-all;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      max-height: 240px; overflow: auto;
+    }
+    .kc-status {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.7rem; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 600;
+    }
+    .kc-status-on { background: #dcfce7; color: #166534; }
+    .kc-status-off { background: #fee2e2; color: #991b1b; }
+    .kc-status-dot {
+      width: 0.5rem; height: 0.5rem; border-radius: 999px;
+    }
+    .kc-status-on .kc-status-dot { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.18); }
+    .kc-status-off .kc-status-dot { background: #dc2626; }
+
+    .kc-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid rgba(148,163,184,0.3); margin-bottom: 0.85rem; }
+    .kc-tab {
+      padding: 0.5rem 0.9rem; font-size: 0.78rem; font-weight: 600;
+      color: var(--ink-soft); cursor: pointer; border: none; background: transparent;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .kc-tab.active { color: var(--ink); border-bottom-color: #4338ca; }
+
+    .kc-claim-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.78rem; }
+    .kc-claim-table th {
+      text-align: left; padding: 0.45rem 0.7rem; background: #f8fafc;
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 600; color: var(--ink-soft);
+      border-bottom: 1px solid rgba(148,163,184,0.3);
+    }
+    .kc-claim-table td {
+      padding: 0.4rem 0.7rem; border-bottom: 1px solid rgba(148,163,184,0.18);
+      vertical-align: top;
+    }
+    .kc-claim-key {
+      font-family: "JetBrains Mono", monospace; font-weight: 600;
+      color: #4338ca; font-size: 0.75rem; white-space: nowrap;
+    }
+    .kc-claim-val {
+      font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+      color: var(--ink); word-break: break-all;
+    }
+
+    .kc-log {
+      background: #0f172a; color: #e2e8f0; padding: 0.7rem 0.9rem; border-radius: 0.5rem;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.7rem; max-height: 220px; overflow: auto;
+    }
+    .kc-log-row { padding: 0.15rem 0; }
+    .kc-log-time { color: #94a3b8; margin-right: 0.5rem; }
+    .kc-log-info { color: #e2e8f0; }
+    .kc-log-ok { color: #4ade80; }
+    .kc-log-err { color: #f87171; }
+    .kc-log-warn { color: #fbbf24; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./keycloak-app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">OIDC</span>
+        <h2 class="page-title mt-3">Keycloak App</h2>
+        <p class="page-subtitle mt-3">
+          Client de test OIDC complet : authorization code + PKCE contre un Keycloak (ou
+          tout autre IdP OIDC). Login, affichage des tokens, userinfo, refresh, logout —
+          équivalent local de <code>https://www.keycloak.org/app/</code>, 100% navigateur.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in" style="border: 1px solid rgba(27, 94, 59, 0.3); background: linear-gradient(180deg, rgba(230, 244, 236, 0.4), rgba(255,255,255,1));">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #dcfce7; color: #166534;">Configuration</span>
+        <h3 class="font-bold text-lg">Connexion au Keycloak</h3>
+        <span id="kc-status" class="kc-status kc-status-off ml-auto">
+          <span class="kc-status-dot"></span>
+          <span id="kc-status-label">Déconnecté</span>
+        </span>
+      </div>
+      <p class="text-xs text-slate-600 mb-3">
+        Le client doit être configuré en <b>public</b> (Access Type: public) côté Keycloak,
+        avec <b>Standard Flow Enabled</b> et l'URL de cette page ajoutée aux
+        <b>Valid Redirect URIs</b> et <b>Web Origins</b> (sinon CORS bloquera l'échange du
+        code contre les tokens).
+      </p>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="kc-label">Base URL Keycloak
+            <span class="kc-label-desc">sans /realms/...</span>
+          </label>
+          <input id="kc-base" type="text" class="field field-mono"
+            placeholder="https://login.example.com" />
+        </div>
+        <div>
+          <label class="kc-label">Realm</label>
+          <input id="kc-realm" type="text" class="field field-mono" placeholder="master" />
+        </div>
+        <div>
+          <label class="kc-label">Client ID
+            <span class="kc-label-desc">public client</span>
+          </label>
+          <input id="kc-client" type="text" class="field field-mono" placeholder="account" />
+        </div>
+        <div>
+          <label class="kc-label">Redirect URI
+            <span class="kc-label-desc">cette page</span>
+          </label>
+          <input id="kc-redirect" type="text" class="field field-mono" />
+        </div>
+        <div>
+          <label class="kc-label">Scope</label>
+          <input id="kc-scope" type="text" class="field field-mono" value="openid profile email" />
+        </div>
+        <div>
+          <label class="kc-label">kc_idp_hint
+            <span class="kc-label-desc">optionnel — alias du broker</span>
+          </label>
+          <input id="kc-idp-hint" type="text" class="field field-mono" placeholder="google" />
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <button id="btn-signin" type="button" class="btn btn-primary">Sign in</button>
+        <button id="btn-refresh" type="button" class="btn btn-ghost" disabled>Refresh token</button>
+        <button id="btn-userinfo" type="button" class="btn btn-ghost" disabled>User info</button>
+        <button id="btn-signout" type="button" class="btn btn-ghost" disabled>Sign out</button>
+        <button id="btn-clear" type="button" class="btn btn-ghost">Reset session</button>
+        <span class="text-xs text-slate-500 ml-auto">
+          Données stockées : <code>sessionStorage</code> uniquement
+        </span>
+      </div>
+    </section>
+
+    <section id="kc-error" class="hidden alert alert-error mb-6 animate-in">
+      <div class="font-bold text-sm mb-1">Erreur</div>
+      <div id="kc-error-msg" class="text-sm"></div>
+    </section>
+
+    <section id="kc-auth" class="hidden card mb-6 animate-in">
+      <div class="kc-tabs">
+        <button data-tab="profile" class="kc-tab active">Profil</button>
+        <button data-tab="access" class="kc-tab">Access token</button>
+        <button data-tab="id" class="kc-tab">ID token</button>
+        <button data-tab="refresh" class="kc-tab">Refresh token</button>
+        <button data-tab="raw" class="kc-tab">Réponse brute</button>
+      </div>
+
+      <div data-pane="profile">
+        <h3 class="font-bold text-lg mb-2">Profil utilisateur</h3>
+        <p class="text-xs text-slate-500 mb-3">
+          Synthèse des claims standard du <code>id_token</code>. Clique sur <b>User info</b>
+          ci-dessus pour interroger le endpoint <code>/userinfo</code> et comparer.
+        </p>
+        <div class="overflow-x-auto">
+          <table id="kc-profile-table" class="kc-claim-table"></table>
+        </div>
+
+        <div id="kc-userinfo-block" class="hidden mt-5">
+          <label class="kc-label">Réponse <code>/userinfo</code></label>
+          <pre id="kc-userinfo" class="kc-out"></pre>
+        </div>
+      </div>
+
+      <div data-pane="access" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-lg">Access token</h3>
+          <button data-copy="access" type="button" class="btn btn-ghost" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Copier</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">
+          Token envoyé en header <code>Authorization: Bearer ...</code> aux API protégées.
+          Souvent un JWT côté Keycloak (mais pas garanti — l'IdP peut renvoyer un token opaque).
+        </p>
+        <pre id="kc-access-raw" class="kc-out" style="max-height: 140px;"></pre>
+        <div class="mt-3">
+          <label class="kc-label">Header</label>
+          <pre id="kc-access-header" class="kc-out" style="max-height: 120px;"></pre>
+        </div>
+        <div class="mt-3">
+          <label class="kc-label">Payload</label>
+          <pre id="kc-access-payload" class="kc-out"></pre>
+        </div>
+        <div class="mt-3">
+          <div id="kc-access-exp" class="text-xs text-slate-500"></div>
+        </div>
+      </div>
+
+      <div data-pane="id" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-lg">ID token</h3>
+          <button data-copy="id" type="button" class="btn btn-ghost" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Copier</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">
+          Identité de l'utilisateur (claim <code>sub</code>) et de la session.
+          À valider côté client selon OIDC Core §3.1.3.7 (voir tool <i>ID Token Validator</i>).
+        </p>
+        <pre id="kc-id-raw" class="kc-out" style="max-height: 140px;"></pre>
+        <div class="mt-3">
+          <label class="kc-label">Header</label>
+          <pre id="kc-id-header" class="kc-out" style="max-height: 120px;"></pre>
+        </div>
+        <div class="mt-3">
+          <label class="kc-label">Payload</label>
+          <pre id="kc-id-payload" class="kc-out"></pre>
+        </div>
+        <div class="mt-3">
+          <div id="kc-id-exp" class="text-xs text-slate-500"></div>
+        </div>
+      </div>
+
+      <div data-pane="refresh" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-lg">Refresh token</h3>
+          <button data-copy="refresh" type="button" class="btn btn-ghost" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Copier</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">
+          Permet d'obtenir un nouvel <code>access_token</code> sans relogin (grant_type
+          <code>refresh_token</code>). Format opaque dans la version par défaut de Keycloak.
+        </p>
+        <pre id="kc-refresh-raw" class="kc-out" style="max-height: 140px;"></pre>
+        <div id="kc-refresh-decoded" class="hidden mt-3">
+          <label class="kc-label">Payload (si JWT)</label>
+          <pre id="kc-refresh-payload" class="kc-out"></pre>
+        </div>
+      </div>
+
+      <div data-pane="raw" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-bold text-lg">Réponse brute du token endpoint</h3>
+          <button data-copy="raw" type="button" class="btn btn-ghost" style="padding:0.3rem 0.7rem;font-size:0.72rem;">Copier</button>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">
+          JSON tel que renvoyé par <code>POST /token</code>. Utile pour debug
+          (<code>expires_in</code>, <code>refresh_expires_in</code>, <code>session_state</code>...).
+        </p>
+        <pre id="kc-raw" class="kc-out"></pre>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #f3e8ff; color: #6d28d9;">Trace</span>
+        <h3 class="font-bold text-lg">Journal des étapes</h3>
+      </div>
+      <p class="text-xs text-slate-500 mb-3">
+        Trace des opérations OIDC : génération PKCE, redirection, échange code↔token,
+        refresh, userinfo, logout. Pratique pour comprendre le flow ou débugger une CORS error.
+      </p>
+      <div id="kc-log" class="kc-log">
+        <div class="kc-log-row kc-log-info">Prêt. Renseigne la configuration puis clique sur <b>Sign in</b>.</div>
+      </div>
+    </section>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #fef3c7; color: #92400e;">Endpoints calculés</span>
+        <h3 class="font-bold text-lg">URL utilisées</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table id="kc-endpoints-table" class="kc-claim-table"></table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · Keycloak App</footer>
+</body>
+</html>
