@@ -133,6 +133,14 @@ window.TOOLS = [
     href: "./tools/cmd-formatter.html",
   },
   {
+    id: "sql-confluence",
+    name: "SQL → Confluence",
+    category: "Données",
+    description:
+      "Colle le résultat copié depuis SQL Developer (champs séparés par des tabulations) et génère un tableau Confluence : markup wiki prêt à coller ou tableau HTML pour le nouvel éditeur. Aperçu live.",
+    href: "./tools/sql-confluence.html",
+  },
+  {
     id: "iframe-simulator",
     name: "Iframe Simulator",
     category: "Données",

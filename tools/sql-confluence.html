@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQL → Confluence — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    pre.cf-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.78rem; white-space: pre; word-break: normal;
+      max-height: 420px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .cf-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    .cf-stat { display: inline-block; background: #f1f5f9; border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.72rem; color: #475569; font-weight: 500; }
+    /* Aperçu du tableau rendu */
+    .cf-preview-wrap { overflow: auto; max-height: 420px; border: 1px solid #e2e8f0; border-radius: 0.6rem; }
+    table.cf-preview { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+    table.cf-preview th, table.cf-preview td {
+      border: 1px solid #cbd5e1; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    table.cf-preview th { background: #f1f5f9; font-weight: 600; color: #1e293b; position: sticky; top: 0; }
+    table.cf-preview tr:nth-child(even) td { background: #f8fafc; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./sql-confluence.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">Texte</span>
+        <h2 class="page-title mt-3">SQL → Confluence</h2>
+        <p class="page-subtitle mt-3">
+          Colle le résultat copié depuis SQL Developer (champs séparés par des tabulations) et
+          récupère un tableau au format Confluence — markup wiki prêt à coller, ou tableau HTML
+          pour le nouvel éditeur.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Entrée</span>
+        <h3 class="font-bold text-lg">Résultat collé</h3>
+      </div>
+
+      <label class="cf-label">Données (copiées depuis SQL Developer)</label>
+      <textarea id="sql-input" rows="8" class="field field-mono"
+        placeholder="ID&#9;NAME&#9;EMAIL&#10;1&#9;Alice&#9;alice@example.com&#10;2&#9;Bob&#9;bob@example.com"></textarea>
+
+      <div class="mt-3 flex flex-wrap items-center gap-4">
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input id="has-header" type="checkbox" checked />
+          Première ligne = en-têtes
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          Séparateur
+          <select id="delimiter" class="field" style="width: auto; padding: 0.3rem 0.5rem;">
+            <option value="\t" selected>Tabulation</option>
+            <option value=";">Point-virgule (;)</option>
+            <option value=",">Virgule (,)</option>
+            <option value="|">Pipe (|)</option>
+            <option value="auto">Auto-détection</option>
+          </select>
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input id="trim-cells" type="checkbox" checked />
+          Trim des cellules
+        </label>
+
+        <button id="convert-btn" type="button" class="btn btn-primary">Convertir</button>
+        <button id="example-btn" type="button" class="btn btn-ghost">Exemple</button>
+        <div id="status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="output-section" class="hidden card animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #ecfdf5; color: #047857;">Résultat</span>
+        <h3 class="font-bold text-lg">Tableau Confluence</h3>
+      </div>
+
+      <div id="stats" class="flex flex-wrap gap-2 mb-4"></div>
+
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button id="copy-wiki" type="button" class="btn btn-primary">Copier (markup wiki)</button>
+        <button id="copy-html" type="button" class="btn" style="background:#0f766e;color:#fff;">Copier (tableau pour éditeur)</button>
+      </div>
+
+      <label class="cf-label">Aperçu</label>
+      <div id="preview-wrap" class="cf-preview-wrap mb-4">
+        <table id="preview-table" class="cf-preview"></table>
+      </div>
+
+      <label class="cf-label">Markup wiki Confluence</label>
+      <pre id="wiki-out" class="cf-out"></pre>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · SQL → Confluence</footer>
+</body>
+</html>
