@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WAF Log → curl — JavaScript Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <style>
+    pre.cf-out {
+      background: #0f172a; color: #e2e8f0; padding: 0.85rem 1rem; border-radius: 0.6rem;
+      font-size: 0.78rem; white-space: pre-wrap; word-break: break-all;
+      max-height: 520px; overflow: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .cf-label { font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 0.25rem; display: block; }
+    .cf-stat { display: inline-block; background: #f1f5f9; border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.72rem; color: #475569; font-weight: 500; }
+    .evt-card { border: 1px solid #fecaca; background: #fef2f2; border-radius: 0.55rem; padding: 0.6rem 0.8rem; font-size: 0.78rem; }
+    .evt-card .fam { font-weight: 700; color: #b91c1c; }
+    .evt-card code { background: #fff; border: 1px solid #fca5a5; border-radius: 4px; padding: 0 0.25rem; font-size: 0.72rem; word-break: break-all; }
+    .req-item { border: 1px solid #e2e8f0; border-radius: 0.7rem; padding: 1rem; }
+  </style>
+  <script src="../assets/js/tools.js" defer></script>
+  <script src="../assets/js/menu.js" defer></script>
+  <script src="../assets/js/export.js" defer></script>
+  <script src="./waf-curl.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <h1 class="text-2xl brand">
+        <a href="../index.html">JavaScript Tools</a>
+      </h1>
+      <nav id="top-menu" class="space-x-5 text-sm"></nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="animate-in mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.14); color: #0369a1;">Sécurité · WAF</span>
+        <h2 class="page-title mt-3">WAF Log → curl</h2>
+        <p class="page-subtitle mt-3">
+          Colle un JSON exporté de ton WAF et obtiens une commande <code>curl</code> de test.
+          Deux formats gérés automatiquement :
+          <b>log de sécurité</b> (objet <code>request</code>) → la requête capturée est rejouée
+          fidèlement ; <b>configuration d'exception</b> (tableau <code>rules</code>) → une requête de test est
+          synthétisée par règle, avec un payload représentatif de la famille d'attaque whitelistée, au bon
+          emplacement (Var_GET / Var_POST / Cookie / Path). Tout reste dans le navigateur.
+        </p>
+      </div>
+      <button id="download-html" type="button" class="btn btn-accent">
+        Télécharger (HTML autonome)
+      </button>
+    </div>
+
+    <section class="card mb-6 animate-in">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="badge" style="background: #eef2ff; color: #4338ca;">Entrée</span>
+        <h3 class="font-bold text-lg">Log JSON</h3>
+      </div>
+
+      <label class="cf-label">JSON du log de sécurité</label>
+      <textarea id="json-input" rows="9" class="field field-mono"
+        placeholder='{"data":[{"request":{...},"events":[...]}]}  ou  {"data":[{"rules":[...]}]}'></textarea>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="cf-label">URL de base (override de l'hôte)</label>
+          <input id="base-url" type="text" class="field field-mono"
+            placeholder="https://app.example.com (laisser vide = hôte du log)" />
+          <p class="cf-hint text-xs text-slate-500 mt-1">Le path et la query du log sont ajoutés automatiquement.</p>
+        </div>
+        <div>
+          <label class="cf-label">Options curl</label>
+          <div class="flex flex-col gap-1.5 text-sm text-slate-700">
+            <label class="inline-flex items-center gap-2"><input id="opt-minimal" type="checkbox" /> Minimal — uniquement les éléments déclencheurs</label>
+            <label class="inline-flex items-center gap-2"><input id="opt-resolve" type="checkbox" /> Ajouter <code class="text-xs">--resolve</code> vers l'IP du WAF (<span id="ipdst-hint">ipDst</span>)</label>
+            <label class="inline-flex items-center gap-2"><input id="opt-insecure" type="checkbox" checked /> <code class="text-xs">-k</code> (ignorer la vérif TLS)</label>
+            <label class="inline-flex items-center gap-2"><input id="opt-resp" type="checkbox" checked /> <code class="text-xs">-i</code> (afficher les headers de réponse)</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button id="gen-btn" type="button" class="btn btn-primary">Générer le curl</button>
+        <button id="example-log-btn" type="button" class="btn btn-ghost">Exemple (log)</button>
+        <button id="example-exc-btn" type="button" class="btn btn-ghost">Exemple (exception)</button>
+        <div id="status" class="text-sm"></div>
+      </div>
+    </section>
+
+    <section id="output-section" class="hidden">
+      <div id="results" class="flex flex-col gap-6"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">JavaScript Tools · WAF Log → curl</footer>
+</body>
+</html>

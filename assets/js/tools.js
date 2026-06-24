@@ -133,6 +133,14 @@ window.TOOLS = [
     href: "./tools/cmd-formatter.html",
   },
   {
+    id: "waf-curl",
+    name: "WAF Log → curl",
+    category: "Données",
+    description:
+      "Reconstruit la requête HTTP d'un log de sécurité WAF en commande curl rejouable (GET/POST/...), pour tester une exception de sécurité. Gère aussi les configurations d'exception (synthèse d'une requête de test par règle). Mode minimal, --resolve, multi-requêtes.",
+    href: "./tools/waf-curl.html",
+  },
+  {
     id: "sql-confluence",
     name: "SQL → Confluence",
     category: "Données",
