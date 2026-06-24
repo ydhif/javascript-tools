@@ -306,24 +306,117 @@
   // ===========================================================================
   // Rendu
   // ===========================================================================
-  function copyBtn(getText) {
+  // Bouton qui copie un texte (lu dynamiquement) avec feedback « Copié ! ».
+  function mkCopyBtn(label, cls, getText) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = "Copier le curl";
-    btn.className = "btn btn-primary mb-2";
+    btn.textContent = label;
+    btn.className = "btn " + cls + " mb-2";
     btn.addEventListener("click", async () => {
       await ToolExport.copyText(getText());
+      const orig = label;
       btn.textContent = "Copié !";
       btn.disabled = true;
-      setTimeout(() => { btn.textContent = "Copier le curl"; btn.disabled = false; }, 1500);
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
     });
     return btn;
   }
 
-  // Ajoute à `wrap` : champ URL de destination éditable + bouton copier + le curl.
-  // `rebuild(forcedUrl)` recalcule le résultat ; l'édition de l'URL régénère le curl.
-  function appendEditableCurl(wrap, idx, rebuild) {
-    const initial = rebuild(urlOverrides[idx]);
+  // --- Restitution (explication lisible + version Confluence wiki) ----------
+  function reportFromLog(r) {
+    const det = r.summary.map((s) =>
+      s.family + (s.cwe ? " (" + s.cwe + ")" : "") +
+      (s.rule ? ", règle « " + s.rule + " »" : "") +
+      (s.locations.length ? " — " + s.locations.join(", ") : "")).join(" ; ") || "détection WAF";
+
+    const data = {
+      title: "Test WAF — " + r.title,
+      sections: [
+        { heading: "Contexte", text:
+          "Requête bloquée par le WAF. Détection : " + det + ". " +
+          "On rejoue ici la requête capturée à l'identique pour vérifier qu'une exception la laisse désormais passer." },
+        { heading: "Requête rejouée", rows: [
+          ["Méthode", r.method],
+          ["URL", r.url],
+          ["Headers", r.counts.headers],
+          ["Cookies", r.counts.cookies],
+          ["Body", r.counts.body ? "oui" : "non"],
+          ["Mode", r.minimalUsed ? "minimal (éléments déclencheurs)" : "complet"],
+        ] },
+        { heading: "Commande de test", text: "{code}\n" + r.curl + "\n{code}" },
+        { heading: "Résultat attendu", text:
+          "Exception active : la requête atteint le backend (une erreur fonctionnelle — code expiré, session — est normale), PAS de page de blocage WAF. " +
+          "Toujours bloquée : page/erreur du WAF → l'exception ne couvre pas ce cas." },
+      ],
+    };
+
+    const md =
+      "# Test WAF — " + r.title + "\n\n" +
+      "**Contexte** — Requête bloquée par le WAF. Détection : " + det + ".\n" +
+      "On rejoue la requête capturée à l'identique pour vérifier qu'une exception la laisse désormais passer.\n\n" +
+      "**Requête rejouée**\n" +
+      "- Méthode : " + r.method + "\n" +
+      "- URL : " + r.url + "\n" +
+      "- Headers : " + r.counts.headers + " · Cookies : " + r.counts.cookies + " · Body : " + (r.counts.body ? "oui" : "non") + "\n" +
+      "- Mode : " + (r.minimalUsed ? "minimal (éléments déclencheurs)" : "complet") + "\n\n" +
+      "**Commande de test**\n```\n" + r.curl + "\n```\n\n" +
+      "**Résultat attendu**\n" +
+      "- ✅ Exception active : la requête atteint le backend (une erreur fonctionnelle est normale), sans page de blocage WAF.\n" +
+      "- ❌ Toujours bloquée : page/erreur du WAF → l'exception ne couvre pas ce cas.";
+
+    return { data, md };
+  }
+
+  function reportFromException(r) {
+    const payloads = r.injections.length ? r.injections.join(" ; ")
+      : "aucun (règle basée sur la méthode ou sans matchingParts)";
+
+    const data = {
+      title: "Test exception WAF — " + r.title,
+      sections: [
+        { heading: "Objectif", text:
+          "Vérifier que l'exception « " + r.title + " » laisse bien passer la requête légitime qui déclenche " +
+          "cette détection (faux positif couvert par l'exception)." +
+          (r.enabled ? "" : " ⚠ Cette règle est actuellement DÉSACTIVÉE dans la configuration.") },
+        { heading: "Conditions de l'exception", text: r.conditions.join("\n") || "(aucune)" },
+        { heading: "Requête de test", rows: [
+          ["Méthode", r.method],
+          ["URL", r.url],
+          ["Payload injecté", payloads],
+        ] },
+        { heading: "Commande de test", text: "{code}\n" + r.curl + "\n{code}" },
+        { heading: "Résultat attendu", text:
+          "Exception active : la requête passe le WAF (une erreur fonctionnelle côté backend est normale). " +
+          "Toujours bloquée : l'exception ne s'applique pas (vérifier URI/hôte/emplacement). " +
+          "Test de contrôle : le même payload sur une autre URI/hôte doit, lui, rester bloqué." },
+      ],
+    };
+
+    const md =
+      "# Test exception WAF — " + r.title + "\n\n" +
+      (r.enabled ? "" : "> ⚠ Règle actuellement DÉSACTIVÉE.\n\n") +
+      "**Objectif** — Vérifier que l'exception laisse passer la requête légitime déclenchant cette détection " +
+      "(faux positif couvert par l'exception).\n\n" +
+      "**Conditions de l'exception**\n" +
+      (r.conditions.length ? r.conditions.map((c) => "- " + c).join("\n") : "- (aucune)") + "\n\n" +
+      "**Requête de test**\n" +
+      "- Méthode : " + r.method + "\n" +
+      "- URL : " + r.url + "\n" +
+      "- Payload injecté : " + payloads + "\n\n" +
+      "**Commande de test**\n```\n" + r.curl + "\n```\n\n" +
+      "**Résultat attendu**\n" +
+      "- ✅ Exception active : la requête passe le WAF (une erreur fonctionnelle côté backend est normale).\n" +
+      "- ❌ Toujours bloquée : l'exception ne s'applique pas — vérifier URI / hôte / emplacement.\n\n" +
+      "**Test de contrôle** — Le même payload sur une autre URI/hôte doit rester bloqué.";
+
+    return { data, md };
+  }
+
+  // Ajoute à `wrap` : URL éditable + curl + restitution explicative.
+  // `rebuild(forcedUrl)` recalcule le résultat ; `makeReport(r)` produit {data, md}.
+  // L'édition de l'URL régénère le curl ET la restitution.
+  function appendEditableCurl(wrap, idx, rebuild, makeReport) {
+    let r = rebuild(urlOverrides[idx]);
 
     const lbl = document.createElement("label");
     lbl.className = "cf-label";
@@ -333,20 +426,42 @@
     const input = document.createElement("input");
     input.type = "text";
     input.className = "field field-mono mb-3";
-    input.value = initial.url;
+    input.value = r.url;
     wrap.appendChild(input);
 
     const pre = document.createElement("pre");
     pre.className = "cf-out";
-    pre.textContent = initial.curl;
-
-    wrap.appendChild(copyBtn(() => pre.textContent));
+    pre.textContent = r.curl;
+    wrap.appendChild(mkCopyBtn("Copier le curl", "btn-primary", () => pre.textContent));
     wrap.appendChild(pre);
+
+    // Restitution
+    let report = makeReport(r);
+    const rlbl = document.createElement("label");
+    rlbl.className = "cf-label";
+    rlbl.style.marginTop = "0.6rem";
+    rlbl.textContent = "Restitution (explication)";
+    wrap.appendChild(rlbl);
+
+    const acts = document.createElement("div");
+    acts.className = "flex flex-wrap gap-2";
+    acts.appendChild(mkCopyBtn("Copier la restitution", "btn-ghost", () => report.md));
+    acts.appendChild(mkCopyBtn("Copier (Confluence wiki)", "", () => ToolExport.toConfluenceWiki(report.data)));
+    acts.querySelectorAll("button")[1].style.cssText = "background:#0f766e;color:#fff;";
+    wrap.appendChild(acts);
+
+    const rpre = document.createElement("pre");
+    rpre.className = "cf-report";
+    rpre.textContent = report.md;
+    wrap.appendChild(rpre);
 
     input.addEventListener("input", () => {
       const forced = input.value.trim();
       urlOverrides[idx] = forced || undefined;
-      pre.textContent = rebuild(forced || undefined).curl;
+      r = rebuild(forced || undefined);
+      pre.textContent = r.curl;
+      report = makeReport(r);
+      rpre.textContent = report.md;
     });
   }
 
@@ -384,8 +499,9 @@
       });
 
       wrap.innerHTML = html;
-      appendEditableCurl(wrap, idx, (forcedUrl) =>
-        buildFromLog(entry, Object.assign({}, opts, { forcedUrl })));
+      appendEditableCurl(wrap, idx,
+        (forcedUrl) => buildFromLog(entry, Object.assign({}, opts, { forcedUrl })),
+        reportFromLog);
       container.appendChild(wrap);
     });
   }
@@ -434,8 +550,9 @@
       if (r.pathNote) html += '<div class="text-xs text-amber-700 mb-2">⚠ ' + escapeHtml(r.pathNote) + "</div>";
 
       wrap.innerHTML = html;
-      appendEditableCurl(wrap, idx, (forcedUrl) =>
-        buildFromException(item, Object.assign({}, opts, { forcedUrl })));
+      appendEditableCurl(wrap, idx,
+        (forcedUrl) => buildFromException(item, Object.assign({}, opts, { forcedUrl })),
+        reportFromException);
       container.appendChild(wrap);
     });
   }
