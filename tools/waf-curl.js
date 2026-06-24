@@ -1,7 +1,8 @@
 (function () {
   const $ = (id) => document.getElementById(id);
 
-  let lastModel = null; // { type, items }
+  let lastModel = null;     // { type, items }
+  let urlOverrides = {};    // URL éditée par l'utilisateur, par index de requête
 
   function setStatus(msg, kind) {
     const el = $("status");
@@ -95,7 +96,8 @@
     const method = (req.method || "GET").toUpperCase();
     const path = req.path || "/";
     const query = req.query ? (req.query.startsWith("?") ? req.query : "?" + req.query) : "";
-    const url = originFrom(req, opts.baseUrl) + path + query;
+    const computedUrl = originFrom(req, opts.baseUrl) + path + query;
+    const url = opts.forcedUrl || computedUrl;
 
     let resolveArg = null;
     if (opts.resolve && req.ipDst) {
@@ -263,7 +265,8 @@
     if (override) origin = /^https?:\/\//i.test(override) ? override : "https://" + override;
     else origin = "https://" + (host || "host.invalid");
 
-    const url = origin + path + (qs ? "?" + qs : "");
+    const computedUrl = origin + path + (qs ? "?" + qs : "");
+    const url = opts.forcedUrl || computedUrl;
 
     // Cookies / headers / body
     const cookieHeader = Object.keys(cookies)
@@ -303,13 +306,13 @@
   // ===========================================================================
   // Rendu
   // ===========================================================================
-  function copyBtn(curlText) {
+  function copyBtn(getText) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = "Copier le curl";
     btn.className = "btn btn-primary mb-2";
     btn.addEventListener("click", async () => {
-      await ToolExport.copyText(curlText);
+      await ToolExport.copyText(getText());
       btn.textContent = "Copié !";
       btn.disabled = true;
       setTimeout(() => { btn.textContent = "Copier le curl"; btn.disabled = false; }, 1500);
@@ -317,9 +320,39 @@
     return btn;
   }
 
+  // Ajoute à `wrap` : champ URL de destination éditable + bouton copier + le curl.
+  // `rebuild(forcedUrl)` recalcule le résultat ; l'édition de l'URL régénère le curl.
+  function appendEditableCurl(wrap, idx, rebuild) {
+    const initial = rebuild(urlOverrides[idx]);
+
+    const lbl = document.createElement("label");
+    lbl.className = "cf-label";
+    lbl.textContent = "URL de destination (éditable)";
+    wrap.appendChild(lbl);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "field field-mono mb-3";
+    input.value = initial.url;
+    wrap.appendChild(input);
+
+    const pre = document.createElement("pre");
+    pre.className = "cf-out";
+    pre.textContent = initial.curl;
+
+    wrap.appendChild(copyBtn(() => pre.textContent));
+    wrap.appendChild(pre);
+
+    input.addEventListener("input", () => {
+      const forced = input.value.trim();
+      urlOverrides[idx] = forced || undefined;
+      pre.textContent = rebuild(forced || undefined).curl;
+    });
+  }
+
   function renderLog(items, opts) {
     const container = $("results");
-    items.forEach((entry) => {
+    items.forEach((entry, idx) => {
       const r = buildFromLog(entry, opts);
       const wrap = document.createElement("div");
       wrap.className = "req-item card animate-in";
@@ -328,7 +361,7 @@
         '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">' +
         '<div class="flex items-center gap-2">' +
         '<span class="badge" style="background:#ecfdf5;color:#047857;">' + escapeHtml(r.method) + "</span>" +
-        '<h3 class="font-bold text-base break-all">' + escapeHtml(r.url) + "</h3></div>" +
+        '<h3 class="font-bold text-base break-all">' + escapeHtml(r.title) + "</h3></div>" +
         (r.tag ? '<span class="cf-stat">' + escapeHtml(r.tag) + "</span>" : "") +
         "</div>";
 
@@ -351,11 +384,8 @@
       });
 
       wrap.innerHTML = html;
-      wrap.appendChild(copyBtn(r.curl));
-      const pre = document.createElement("pre");
-      pre.className = "cf-out";
-      pre.textContent = r.curl;
-      wrap.appendChild(pre);
+      appendEditableCurl(wrap, idx, (forcedUrl) =>
+        buildFromLog(entry, Object.assign({}, opts, { forcedUrl })));
       container.appendChild(wrap);
     });
   }
@@ -375,7 +405,7 @@
       "fonctionnelle, c'est normal. Test de contrôle : le même payload sur une autre URI/hôte doit rester bloqué.";
     container.appendChild(note);
 
-    items.forEach((item) => {
+    items.forEach((item, idx) => {
       const r = buildFromException(item, opts);
       const wrap = document.createElement("div");
       wrap.className = "req-item card animate-in";
@@ -387,8 +417,6 @@
         '<h3 class="font-bold text-sm break-all">' + escapeHtml(r.title) + "</h3></div>" +
         (r.enabled ? "" : '<span class="cf-stat" style="background:#fee2e2;color:#b91c1c;">désactivée</span>') +
         "</div>";
-
-      html += '<div class="text-xs text-slate-600 mb-2 break-all">' + escapeHtml(r.url) + "</div>";
 
       // Conditions
       if (r.conditions.length) {
@@ -406,11 +434,8 @@
       if (r.pathNote) html += '<div class="text-xs text-amber-700 mb-2">⚠ ' + escapeHtml(r.pathNote) + "</div>";
 
       wrap.innerHTML = html;
-      wrap.appendChild(copyBtn(r.curl));
-      const pre = document.createElement("pre");
-      pre.className = "cf-out";
-      pre.textContent = r.curl;
-      wrap.appendChild(pre);
+      appendEditableCurl(wrap, idx, (forcedUrl) =>
+        buildFromException(item, Object.assign({}, opts, { forcedUrl })));
       container.appendChild(wrap);
     });
   }
@@ -448,6 +473,7 @@
     }
 
     lastModel = model;
+    urlOverrides = {}; // nouvelle génération → on repart des URL dérivées du contenu
     $("output-section").classList.remove("hidden");
     render();
 
