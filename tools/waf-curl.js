@@ -67,18 +67,34 @@
   function collectTriggers(events) {
     const cookies = new Set();
     const headers = new Set();
+    const getParams = new Set();
+    const postParams = new Set();
     let needBody = false;
+    let path = false;
     (events || []).forEach((ev) => {
       const parts = (ev.tokens && ev.tokens.matchingParts) || [];
       parts.forEach((mp) => {
         const part = String(mp.part || "").toLowerCase();
-        if (part === "cookie" && mp.partKey) cookies.add(mp.partKey);
-        else if (part === "header" && mp.partKey) headers.add(String(mp.partKey).toLowerCase());
-        else if (["body", "parameter", "parameters", "post", "var_post"].includes(part)) needBody = true;
-        // query/url/path : déjà reproduits via l'URL.
+        const key = mp.partKey;
+        if (part === "cookie" && key) cookies.add(key);
+        else if (part === "header" && key) headers.add(String(key).toLowerCase());
+        else if (part === "var_get" && key) getParams.add(key);
+        else if (part === "var_post" && key) { postParams.add(key); needBody = true; }
+        else if (["body", "parameter", "parameters", "post"].includes(part)) needBody = true;
+        else if (["path", "uri", "url"].includes(part)) path = true;
       });
     });
-    return { cookies, headers, needBody };
+    return { cookies, headers, getParams, postParams, needBody, path };
+  }
+
+  // Garde uniquement les paires k=v dont la clé est dans `names` (encodage d'origine préservé).
+  function filterKV(str, names) {
+    return String(str || "").split("&").filter((p) => {
+      if (!p) return false;
+      let k = p.split("=")[0] || "";
+      try { k = decodeURIComponent(k); } catch (_) {}
+      return names.has(k);
+    }).join("&");
   }
 
   function originFrom(req, baseUrl) {
@@ -95,8 +111,36 @@
     const req = entry.request || {};
     const method = (req.method || "GET").toUpperCase();
     const path = req.path || "/";
-    const query = req.query ? (req.query.startsWith("?") ? req.query : "?" + req.query) : "";
-    const computedUrl = originFrom(req, opts.baseUrl) + path + query;
+    const rawQuery = (req.query || "").replace(/^\?/, "");
+    const trig = collectTriggers(entry.events);
+
+    let minimalUsed = opts.minimal;
+    let headers = Array.isArray(req.headers) ? req.headers.slice() : [];
+    let cookies = Array.isArray(req.cookies) ? req.cookies.slice() : [];
+    let queryStr = rawQuery;
+    let body = req.body || "";
+
+    if (opts.minimal) {
+      // On ne garde QUE le(s) champ(s) qui a/ont déclenché l'alerte.
+      const fCookies = cookies.filter((c) => trig.cookies.has(c.key));
+      const fHeaders = headers.filter((h) => trig.headers.has(String(h.key).toLowerCase()));
+      const fQuery = trig.getParams.size ? filterKV(rawQuery, trig.getParams) : null;
+      const fBody = trig.postParams.size ? filterKV(req.body || "", trig.postParams) : null;
+      const hasTrigger = fCookies.length || fHeaders.length ||
+        fQuery !== null || fBody !== null || trig.needBody || trig.path;
+      if (hasTrigger) {
+        cookies = fCookies;
+        headers = fHeaders;
+        if (fQuery !== null) queryStr = fQuery;       // query réduite au paramètre bloquant
+        if (fBody !== null) body = fBody;             // body réduit au paramètre bloquant
+        else if (!trig.needBody) body = "";           // sinon on retire le body
+      } else {
+        minimalUsed = false; // aucune info de blocage exploitable → on garde la requête complète
+      }
+    }
+
+    const queryPart = queryStr ? "?" + queryStr : "";
+    const computedUrl = originFrom(req, opts.baseUrl) + path + queryPart;
     const url = opts.forcedUrl || computedUrl;
 
     let resolveArg = null;
@@ -108,27 +152,9 @@
       } catch (_) {}
     }
 
-    const trig = collectTriggers(entry.events);
-    let minimalUsed = opts.minimal;
-    let headers = Array.isArray(req.headers) ? req.headers.slice() : [];
-    let cookies = Array.isArray(req.cookies) ? req.cookies.slice() : [];
-
-    if (opts.minimal) {
-      const fCookies = cookies.filter((c) => trig.cookies.has(c.key));
-      const fHeaders = headers.filter((h) => trig.headers.has(String(h.key).toLowerCase()));
-      if (fCookies.length || fHeaders.length || trig.needBody) {
-        cookies = fCookies;
-        headers = fHeaders;
-      } else {
-        minimalUsed = false;
-      }
-    }
-
     const SKIP = new Set(["host", "content-length", "cookie"]);
     const keptHeaders = headers.filter((h) => h && h.key && !SKIP.has(String(h.key).toLowerCase()));
 
-    let body = req.body || "";
-    if (minimalUsed && !trig.needBody) body = "";
     const hasBody = body.length > 0;
 
     if (minimalUsed && hasBody && !keptHeaders.some((h) => String(h.key).toLowerCase() === "content-type")) {
@@ -229,6 +255,7 @@
     let pathPayload = null;
     let methodHint = null;
     const injections = [];
+    const csv = []; // {location, field, payload} pour la sortie cases.csv
 
     Object.values(groups).forEach((g) => {
       const partL = g.part.toLowerCase();
@@ -236,12 +263,12 @@
       if (!g.name && !g.literal) return;
       const payload = payloadFor(g.name, g.literal);
       const fam = g.name || "match « " + g.literal + " »";
-      if (partL === "var_get") { query[g.key] = payload; injections.push("Var_GET " + g.key + " ← " + fam); }
-      else if (partL === "var_post") { form[g.key] = payload; methodHint = "POST"; injections.push("Var_POST " + g.key + " ← " + fam); }
-      else if (partL === "cookie") { cookies[g.key] = payload; injections.push("Cookie " + g.key + " ← " + fam); }
-      else if (partL === "header") { headers[g.key] = payload; injections.push("Header " + g.key + " ← " + fam); }
+      if (partL === "var_get") { query[g.key] = payload; injections.push("Var_GET " + g.key + " ← " + fam); csv.push({ location: "query", field: g.key, payload }); }
+      else if (partL === "var_post") { form[g.key] = payload; methodHint = "POST"; injections.push("Var_POST " + g.key + " ← " + fam); csv.push({ location: "body", field: g.key, payload }); }
+      else if (partL === "cookie") { cookies[g.key] = payload; injections.push("Cookie " + g.key + " ← " + fam); csv.push({ location: "cookie", field: g.key, payload }); }
+      else if (partL === "header") { headers[g.key] = payload; injections.push("Header " + g.key + " ← " + fam); csv.push({ location: "header", field: g.key, payload }); }
       else if (partL === "path") { pathPayload = payload; injections.push("Path ← " + fam); }
-      else { query[g.key || "q"] = payload; injections.push((g.part || "param") + " " + g.key + " ← " + fam); }
+      else { query[g.key || "q"] = payload; injections.push((g.part || "param") + " " + g.key + " ← " + fam); csv.push({ location: "query", field: g.key || "q", payload }); }
     });
 
     const method = methodFromRegex(methodRe) || methodHint || (Object.keys(form).length ? "POST" : "GET");
@@ -251,7 +278,7 @@
     let pathNote = "";
     if (pathPayload) {
       if (uriOp === "is") pathNote = "Le pattern « Php URI » porte sur le Path mais la condition uri est « is » : payload de path non inséré (ajuste manuellement).";
-      else path = path.replace(/\/+$/, "") + pathPayload;
+      else { path = path.replace(/\/+$/, "") + pathPayload; csv.push({ location: "none", field: "", payload: "", pathOverride: path }); }
     }
 
     // Query string
@@ -298,9 +325,72 @@
       injections,
       pathNote,
       noPayload,
+      reqPath: path,
+      csv,
       conditions: conds.map((c) =>
         (c.part || "") + " " + (c.valueOperator || "") + " « " + (c.value != null ? c.value : c.key) + " »"),
     };
+  }
+
+  // ===========================================================================
+  // Sortie cases.csv (name|method|path|location|field|payload|expect)
+  // ===========================================================================
+  function csvEsc(s) {
+    return String(s == null ? "" : s).replace(/\|/g, "/").replace(/\r?\n/g, " ");
+  }
+  function cookieValue(req, field) {
+    const c = (req.cookies || []).find((x) => x.key === field);
+    if (!c) return "";
+    const v = c.value || "";
+    return v.startsWith(field + "=") ? v.slice(field.length + 1) : v;
+  }
+  function headerValue(req, field) {
+    const h = (req.headers || []).find((x) => String(x.key).toLowerCase() === String(field).toLowerCase());
+    return h ? (h.value || "") : "";
+  }
+  function kvValue(str, field) {
+    const found = String(str || "").replace(/^\?/, "").split("&").find((p) => {
+      let k = p.split("=")[0] || "";
+      try { k = decodeURIComponent(k); } catch (_) {}
+      return k === field;
+    });
+    if (!found) return "";
+    let v = found.slice(found.indexOf("=") + 1);
+    try { v = decodeURIComponent(v); } catch (_) {}
+    return v;
+  }
+
+  function csvLinesFromException(r) {
+    const name = csvEsc(r.title);
+    if (!r.csv.length) {
+      return [[name, r.method, r.reqPath, "none", "", "", "allowed"].join("|")];
+    }
+    return r.csv.map((inj) => {
+      const p = inj.location === "none" ? (inj.pathOverride || r.reqPath) : r.reqPath;
+      return [name, r.method, p, inj.location, csvEsc(inj.field), csvEsc(inj.payload), "allowed"].join("|");
+    });
+  }
+
+  function csvLinesFromLog(entry, r) {
+    const req = entry.request || {};
+    const name = csvEsc(r.title);
+    const method = r.method;
+    const path = req.path || "/";
+    const parts = [];
+    (entry.events || []).forEach((ev) =>
+      ((ev.tokens && ev.tokens.matchingParts) || []).forEach((mp) => parts.push(mp)));
+    if (!parts.length) return [[name, method, path, "none", "", "", "allowed"].join("|")];
+    return parts.map((mp) => {
+      const part = String(mp.part || "").toLowerCase();
+      const field = mp.partKey || "";
+      let location = "none";
+      let payload = mp.partValueMatch || "";
+      if (part === "cookie") { location = "cookie"; payload = cookieValue(req, field) || payload; }
+      else if (part === "header") { location = "header"; payload = headerValue(req, field) || payload; }
+      else if (part === "var_get") { location = "query"; payload = kvValue(req.query, field) || payload; }
+      else if (part === "var_post") { location = "body"; payload = kvValue(req.body, field) || payload; }
+      return [name, method, path, location, csvEsc(field), csvEsc(payload), "allowed"].join("|");
+    });
   }
 
   // ===========================================================================
@@ -465,6 +555,28 @@
     });
   }
 
+  // Bloc « ligne(s) cases.csv » copiable.
+  function appendCsvBlock(wrap, lines) {
+    const text = lines.join("\n");
+    const lbl = document.createElement("label");
+    lbl.className = "cf-label";
+    lbl.style.marginTop = "0.6rem";
+    lbl.textContent = "Ligne(s) cases.csv  ·  name|method|path|location|field|payload|expect";
+    wrap.appendChild(lbl);
+
+    const acts = document.createElement("div");
+    acts.className = "flex flex-wrap gap-2";
+    const btn = mkCopyBtn("Copier (cases.csv)", "", () => text);
+    btn.style.cssText = "background:#0f766e;color:#fff;";
+    acts.appendChild(btn);
+    wrap.appendChild(acts);
+
+    const pre = document.createElement("pre");
+    pre.className = "cf-report";
+    pre.textContent = text;
+    wrap.appendChild(pre);
+  }
+
   function renderLog(items, opts) {
     const container = $("results");
     items.forEach((entry, idx) => {
@@ -502,6 +614,7 @@
       appendEditableCurl(wrap, idx,
         (forcedUrl) => buildFromLog(entry, Object.assign({}, opts, { forcedUrl })),
         reportFromLog);
+      appendCsvBlock(wrap, csvLinesFromLog(entry, r));
       container.appendChild(wrap);
     });
   }
@@ -553,6 +666,7 @@
       appendEditableCurl(wrap, idx,
         (forcedUrl) => buildFromException(item, Object.assign({}, opts, { forcedUrl })),
         reportFromException);
+      appendCsvBlock(wrap, csvLinesFromException(r));
       container.appendChild(wrap);
     });
   }
